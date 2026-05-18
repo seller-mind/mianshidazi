@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     // const calculatedSign = md5(...);
 
     // 处理支付成功逻辑
-    if (params trade_status === 'OD' || params.trade_status === 'TRADE_SUCCESS') {
+    if (params.trade_status === 'OD' || params.trade_status === 'TRADE_SUCCESS') {
       const orderNo = params.out_trade_no;
       // 更新订单状态，发放会员权限
       console.log('Payment successful for order:', orderNo);
