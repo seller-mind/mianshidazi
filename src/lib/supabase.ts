@@ -1,11 +1,11 @@
 // Supabase 客户端配置
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lhxrauqvqvehhqbzvzjr.supabase.co';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxoeHJhdXF2cXZlaGhxYnp2empyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3ODgxNTk5OCwiZXhwIjoyMDk0MzkxOTk4fQ.k6rADD9V_NhIf63E5Ej2ZcSnG0Q00J8gKdcuGo5HfT4';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // 服务端Supabase客户端（用于写入数据）
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+export const supabaseAdmin = createClient(supabaseUrl!, supabaseServiceKey!, {
   auth: {
     autoRefreshToken: false,
     persistSession: false,

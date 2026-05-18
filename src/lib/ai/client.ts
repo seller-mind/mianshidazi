@@ -5,7 +5,7 @@ const API_ENDPOINT = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions'
 const MODEL_ID = 'ep-20260515144642-96m6k';
 
 // 从环境变量获取API Key，如果没有则使用默认值（仅用于开发）
-const API_KEY = process.env.DASHSCOPE_API_KEY || 'sk-dc2a943892cf4f329907824f00d3bbed';
+const API_KEY = process.env.DASHSCOPE_API_KEY;
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
