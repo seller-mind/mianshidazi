@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useTTS } from '@/lib/hooks/useTTS';
+import { TTSPlayButton } from '@/components/ui/TTSPlayButton';
 
 // 消息类型
 interface Message {
@@ -20,6 +22,9 @@ export default function InterviewChat({ sessionId, persona, interviewType = '通
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // TTS 语音播放
+  const { play, stop, isPlayingMessage, isLoadingMessage, error: ttsError } = useTTS({ persona });
 
   // 自动滚动到底部
   useEffect(() => {
@@ -154,8 +159,17 @@ export default function InterviewChat({ sessionId, persona, interviewType = '通
         {messages.map(msg => (
           <div
             key={msg.id}
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-start gap-2`}
           >
+            {msg.role === 'assistant' && msg.content && (
+              <TTSPlayButton
+                isPlaying={isPlayingMessage(msg.id)}
+                isLoading={isLoadingMessage(msg.id)}
+                onClick={() => play(msg.content, msg.id)}
+                disabled={!msg.content.trim()}
+                size="sm"
+              />
+            )}
             <div
               className={`max-w-[80%] px-4 py-2 rounded-lg ${
                 msg.role === 'user'

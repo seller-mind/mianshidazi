@@ -4,3 +4,4 @@ export { ChatBubble } from './ChatBubble';
 export { TensionMeter } from './TensionMeter';
 export { ProgressIndicator } from './ProgressIndicator';
 export { Avatar, AdaAvatar } from './Avatar';
+export { TTSPlayButton } from './TTSPlayButton';

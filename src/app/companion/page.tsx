@@ -4,6 +4,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui';
 import { generateId } from '@/lib/utils';
+import { useTTS } from '@/lib/hooks/useTTS';
+import { TTSPlayButton } from '@/components/ui/TTSPlayButton';
 import type { ChatMessage } from '@/types';
 
 interface Message {
@@ -19,6 +21,9 @@ export default function CompanionPage() {
   const [sessionId] = useState(() => generateId());
   const [context, setContext] = useState('日常');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // TTS 语音播放 - 阿搭陪伴使用专属音色
+  const { play, isPlayingMessage, isLoadingMessage } = useTTS({ isCompanion: true });
 
   // 滚动到底部
   useEffect(() => {
@@ -231,8 +236,17 @@ export default function CompanionPage() {
           {messages.map((msg) => (
             <div
               key={msg.id}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-start gap-2`}
             >
+              {msg.role === 'assistant' && msg.content && (
+                <TTSPlayButton
+                  isPlaying={isPlayingMessage(msg.id)}
+                  isLoading={isLoadingMessage(msg.id)}
+                  onClick={() => play(msg.content, msg.id)}
+                  disabled={!msg.content.trim()}
+                  size="sm"
+                />
+              )}
               <div
                 className={`max-w-[80%] px-4 py-3 rounded-2xl ${
                   msg.role === 'user'
