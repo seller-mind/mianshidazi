@@ -5,12 +5,12 @@ import { useSearchParams } from 'next/navigation';
 import { TENSION_TYPES } from '@/lib/ai/config';
 import { generateLocalResponse } from '@/lib/ai/chat';
 import { ChatBubble, Button, AdaAvatar, Card } from '@/components/ui';
-import type { ChatMessage, TensionType } from '@/types';
+import type { ChatMessage, TensionLevel } from '@/types';
 import { generateId } from '@/lib/utils';
 
 function PracticeContent() {
   const searchParams = useSearchParams();
-  const tensionType = (searchParams.get('type') as TensionType) || undefined;
+  const tensionType = (searchParams.get('type') as TensionLevel) || undefined;
   const tensionIndex = searchParams.get('tension');
   
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -164,9 +164,9 @@ function PracticeContent() {
       {/* 消息区域 */}
       <div className="flex-1 overflow-y-auto px-6 py-4">
         <div className="max-w-2xl mx-auto space-y-4">
-          {messages.map((message) => (
+          {messages.filter(m => m.role !== 'system').map((message) => (
             <div key={message.id} className="animate-fade-in">
-              <ChatBubble message={message.content} role={message.role} />
+              <ChatBubble message={message.content} role={message.role as 'user' | 'assistant'} />
             </div>
           ))}
           

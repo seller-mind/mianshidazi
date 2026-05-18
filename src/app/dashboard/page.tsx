@@ -4,13 +4,13 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button, Card, AdaAvatar } from '@/components/ui';
 import { TENSION_TYPES } from '@/lib/ai/config';
-import type { TensionType } from '@/types';
+import type { TensionLevel } from '@/types';
 
 export default function DashboardPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userData, setUserData] = useState({
     email: '',
-    tensionType: undefined as TensionType | undefined,
+    tensionType: undefined as TensionLevel | undefined,
     tensionIndex: 0,
     practiceCount: 0,
     memberStatus: 'free' as 'free' | 'monthly' | 'quarterly',

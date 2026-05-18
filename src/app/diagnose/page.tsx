@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { DIAGNOSTIC_QUESTIONS, TENSION_TYPES, calculateDiagnosticResult } from '@/lib/ai/config';
 import { Button, ProgressIndicator, Card } from '@/components/ui';
-import type { DiagnosticAnswer, TensionType } from '@/types';
+import type { DiagnosticAnswer, TensionLevel } from '@/types';
 
 export default function DiagnosePage() {
   const router = useRouter();
@@ -12,9 +12,9 @@ export default function DiagnosePage() {
   const [answers, setAnswers] = useState<(number | null)[]>(new Array(DIAGNOSTIC_QUESTIONS.length).fill(null));
   const [isComplete, setIsComplete] = useState(false);
   const [result, setResult] = useState<{
-    primaryType: TensionType;
+    primaryType: TensionLevel;
     tensionIndex: number;
-    scores: Record<TensionType, number>;
+    scores: Record<TensionLevel, number>;
   } | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
 

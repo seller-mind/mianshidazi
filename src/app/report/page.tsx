@@ -4,11 +4,11 @@ import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { TENSION_TYPES } from '@/lib/ai/config';
 import { Button, Card, TensionMeter } from '@/components/ui';
-import type { TensionType } from '@/types';
+import type { TensionLevel } from '@/types';
 
 function ReportContent() {
   const searchParams = useSearchParams();
-  const tensionType = (searchParams.get('type') as TensionType) || 'A';
+  const tensionType = (searchParams.get('type') as TensionLevel) || 'A';
   const tensionIndex = parseInt(searchParams.get('tension') || '65', 10);
   const performanceScore = Math.max(40, 100 - tensionIndex * 0.6);
 

@@ -55,7 +55,7 @@ function extractHighlights(
     const prevAssistantMsg = messages[i - 1];
     if (prevAssistantMsg?.role !== 'assistant') continue;
 
-    const score = scoreAnswer(userMsg.content, userMsg.tensionSignal);
+    const score = scoreAnswer(userMsg.content);
     
     if (score >= 75) {
       highlights.push({
@@ -129,7 +129,7 @@ function generateSuggestions(
   const suggestions: Array<{ priority: number; title: string; description: string }> = [];
 
   // 根据紧张类型推荐
-  if (tensionDiagnosis.tensionIndex >= 60) {
+  if ((tensionDiagnosis.tensionIndex ?? 0) >= 60) {
     suggestions.push({
       priority: 1,
       title: '学习4-7-8呼吸法',
@@ -137,7 +137,7 @@ function generateSuggestions(
     });
   }
 
-  if (tensionDiagnosis.tensionIndex >= 40) {
+  if ((tensionDiagnosis.tensionIndex ?? 0) >= 40) {
     suggestions.push({
       priority: 2,
       title: '练习过渡句',
@@ -214,13 +214,23 @@ export function generateInterviewReport(
   return {
     sessionId,
     summary,
+    overallScore: realLevel,
+    tensionIndex: overallIndex,
     scores: {
+      overall: realLevel,
       actualScore,
       realLevel,
       tensionLost: tensionLoss,
     },
     highlights,
+    improvements: suggestions.map(s => s.title),
     tensionLosses,
+    tensionAnalysis: {
+      totalSignals: tensionSignals.length,
+      criticalSignals: tensionSignals.filter(s => s.score > 50).length,
+      dominantType: tensionSignals.length > 0 ? tensionSignals[0].type : null,
+      tips: suggestions.map(s => s.title),
+    },
     tensionDiagnosis: diagnosis,
     suggestions,
     adaMessage,
@@ -235,26 +245,26 @@ export function formatReportAsText(report: InterviewReport): string {
   let text = `
 # 面试报告
 
-## ${report.summary}
+## ${report.summary ?? '面试报告'}
 
 ## 表现分析
-- 实际表现分：${report.scores.actualScore}
-- 真实水平：${report.scores.realLevel}
-- 紧张偷走的分数：${report.scores.tensionLost}
+- 实际表现分：${report.scores?.actualScore ?? 0}
+- 真实水平：${report.scores?.realLevel ?? 0}
+- 紧张偷走的分数：${report.scores?.tensionLost ?? 0}
 
 ## 紧张类型诊断
-- 类型：${report.tensionDiagnosis.typeName}
-- 紧张指数：${report.tensionDiagnosis.tensionIndex}
-- 描述：${report.tensionDiagnosis.description}
+- 类型：${report.tensionDiagnosis?.typeName ?? '未知'}
+- 紧张指数：${report.tensionDiagnosis?.tensionIndex ?? 0}
+- 描述：${report.tensionDiagnosis?.description ?? ''}
 
 ## 亮点
 ${report.highlights.map((h, i) => `${i + 1}. ${h.question}（得分：${h.score}）`).join('\n')}
 
 ## 紧张导致的损失
-${report.tensionLosses.map((l, i) => `${i + 1}. ${l.reason}，损失约${l.lostPoints}分`).join('\n')}
+${(report.tensionLosses ?? []).map((l, i) => `${i + 1}. ${l.reason}，损失约${l.lostPoints}分`).join('\n')}
 
 ## 进步建议
-${report.suggestions.map((s, i) => `${i + 1}. ${s.title}：${s.description}`).join('\n')}
+${(report.suggestions ?? []).map((s, i) => `${i + 1}. ${s.title}：${s.description}`).join('\n')}
 
 ## 阿搭说
 ${report.adaMessage}

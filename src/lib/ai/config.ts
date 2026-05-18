@@ -1,7 +1,8 @@
-import { type TensionType } from '@/types';
+import { type TensionSignalType, type TensionLevel } from '@/types';
 
-// 紧张类型配置
-export const TENSION_TYPES: Record<TensionType, {
+// 紧张类型配置 - 这里使用的是诊断问卷中的紧张类型等级
+export type DiagnosticTensionType = TensionLevel;
+export const TENSION_TYPES: Record<DiagnosticTensionType, {
   name: string;
   description: string;
   symptoms: string[];
@@ -184,11 +185,11 @@ export const DIAGNOSTIC_QUESTIONS = [
 
 // 计算诊断结果
 export function calculateDiagnosticResult(answers: number[][]): {
-  primaryType: TensionType;
+  primaryType: DiagnosticTensionType;
   tensionIndex: number;
-  scores: Record<TensionType, number>;
+  scores: Record<DiagnosticTensionType, number>;
 } {
-  const scores: Record<TensionType, number> = { A: 0, B: 0, C: 0, D: 0, E: 0 };
+  const scores: Record<DiagnosticTensionType, number> = { A: 0, B: 0, C: 0, D: 0, E: 0 };
 
   answers.forEach((questionAnswers, questionIndex) => {
     if (questionIndex < DIAGNOSTIC_QUESTIONS.length) {
@@ -196,7 +197,7 @@ export function calculateDiagnosticResult(answers: number[][]): {
       questionAnswers.forEach(answerIndex => {
         if (answerIndex >= 0 && answerIndex < question.options.length) {
           const optionScores = question.options[answerIndex].scores;
-          (Object.keys(optionScores) as TensionType[]).forEach(type => {
+          (Object.keys(optionScores) as DiagnosticTensionType[]).forEach(type => {
             scores[type] += optionScores[type];
           });
         }
@@ -206,7 +207,7 @@ export function calculateDiagnosticResult(answers: number[][]): {
 
   // 找出最高分的类型
   const maxScore = Math.max(...Object.values(scores));
-  const primaryType = (Object.entries(scores).find(([_, v]) => v === maxScore)?.[0] || 'A') as TensionType;
+  const primaryType = (Object.entries(scores).find(([_, v]) => v === maxScore)?.[0] || 'A') as DiagnosticTensionType;
 
   // 计算紧张指数 (基于总分)
   const totalScore = Object.values(scores).reduce((a, b) => a + b, 0);

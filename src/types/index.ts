@@ -1,105 +1,132 @@
-// 紧张类型枚举
-export type TensionType = 'A' | 'B' | 'C' | 'D' | 'E';
+// 全局类型定义
 
-export interface TensionTypeInfo {
-  type: TensionType;
-  name: string;
-  description: string;
-  symptoms: string[];
-  advice: string[];
-}
-
-// 诊断问卷问题
-export interface DiagnosticQuestion {
-  id: number;
-  question: string;
-  subtext?: string;
-  options: {
-    text: string;
-    scores: Record<TensionType, number>;
-  }[];
-}
-
-// 诊断结果
-export interface DiagnosticResult {
-  primaryType: TensionType;
-  tensionIndex: number; // 0-100
-  performanceScore: number;
-  realLevelScore: number;
-  scoreLost: number;
-  matchedTypes: {
-    type: TensionType;
-    score: number;
-  }[];
-}
-
-// AI对话消息
-export interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-}
-
-// 面试练习会话
-export interface PracticeSession {
-  id: string;
-  userId: string;
-  tensionType: TensionType;
-  createdAt: Date;
-  messages: ChatMessage[];
-  status: 'active' | 'completed';
-}
-
-// 用户档案
-export interface UserProfile {
-  id: string;
-  email: string;
-  tensionType?: TensionType;
-  tensionIndex?: number;
-  practiceCount: number;
-  createdAt: Date;
-}
-
-// 定价方案
-export interface PricingPlan {
-  id: string;
-  name: string;
-  price: number;
-  originalPrice?: number;
-  features: string[];
-  isPopular?: boolean;
-}
-
-// 支付订单
-export interface PaymentOrder {
-  id: string;
-  userId: string;
-  planId: string;
-  amount: number;
-  status: 'pending' | 'paid' | 'failed';
-  createdAt: Date;
-}
-
-// 诊断问卷答案记录
-export interface DiagnosticAnswer {
-  questionId: number;
-  selectedOption: number;
-  scores: Record<TensionType, number>;
-}
-
-// 面试官人格类型
+// ==================== 面试人格类型 ====================
 export type PersonaType = 'A' | 'B' | 'C' | 'D' | 'E';
 
-// 陪伴对话上下文
-export type CompanionContext = '深夜' | '面试前' | '面试后' | '等通知' | '崩溃急救' | '日常';
+// 人格配置
+export interface PersonaConfig {
+  id: PersonaType;
+  name: string;
+  description: string;
+  suitableFor: string[];
+  characteristics: string[];
+}
 
-// 紧张信号
+// 陪伴上下文
+export interface CompanionContext {
+  userName?: string;
+  currentMood?: string;
+  focusTopics?: string[];
+}
+
+// ==================== 紧张检测类型 ====================
+export type TensionSignalType = 'pause' | 'speed' | 'filler' | 'length';
+
+// 保持向后兼容
+export type TensionType = TensionSignalType;
+
 export interface TensionSignal {
-  pauseCount: number;
-  avgResponseTime: number;
-  fillerWordCount: number;
-  responseLength: number;
+  type: TensionSignalType;
+  score: number;
+  value: number;
+  threshold: number;
+  message: string;
+}
+
+// 紧张等级类型
+export type TensionLevel = 'A' | 'B' | 'C' | 'D' | 'E';
+
+export interface TensionDiagnosis {
+  overallScore: number;
+  signals: TensionSignal[];
+  dominantType: TensionSignalType | null;
+  tips: string[];
+  // 以下是 diagnoseTensionType 函数使用的属性
+  type?: TensionLevel;
+  typeName?: string;
+  tensionIndex?: number;
+  description?: string;
+  suggestions?: string[];
+}
+
+// ==================== 面试报告类型 ====================
+export interface InterviewReport {
+  overallScore: number;
   tensionIndex: number;
-  timestamp: Date;
+  highlights: Array<{
+    question: string;
+    answer: string;
+    score: number;
+  }>;
+  improvements: string[];
+  tensionAnalysis: {
+    totalSignals: number;
+    criticalSignals: number;
+    dominantType: TensionSignalType | null;
+    tips: string[];
+  };
+  adaMessage: string;
+  // 以下是 report-generator.ts generateReport 函数实际返回的属性
+  sessionId?: string;
+  summary?: string;
+  scores?: {
+    overall?: number;
+    content?: number;
+    expression?: number;
+    confidence?: number;
+    // 额外的分数属性
+    actualScore?: number;
+    realLevel?: number;
+    tensionLost?: number;
+  };
+  tensionDiagnosis?: TensionDiagnosis;
+  tensionLosses?: Array<{ question?: string; reason: string; lostPoints: number }>;
+  suggestions?: Array<{ priority?: number; title: string; description: string }>;
+  createdAt?: string | number;
+}
+
+// ==================== 豆包 API 类型 ====================
+export interface DoubaoChoice {
+  index: number;
+  message: {
+    role: string;
+    content: string;
+  };
+  finish_reason: string;
+}
+
+export interface DoubaoResponse {
+  id: string;
+  object: string;
+  created: number;
+  model: string;
+  choices: DoubaoChoice[];
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}
+
+// ==================== 聊天消息类型 ====================
+export interface ChatMessage {
+  id?: string;
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+  timestamp?: Date;
+}
+
+// ==================== 诊断答案类型 ====================
+export interface DiagnosticAnswer {
+  questionId: string;
+  answer: string;
+  timestamp: number;
+}
+
+// ==================== 诊断结果类型 ====================
+export interface DiagnosticResult {
+  answers: DiagnosticAnswer[];
+  tensionIndex: number;
+  diagnosis: TensionDiagnosis;
+  tips: string[];
 }

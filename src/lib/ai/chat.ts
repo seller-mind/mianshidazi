@@ -1,4 +1,4 @@
-import { type TensionType } from '@/types';
+import { type TensionLevel } from '@/types';
 import { TENSION_TYPES } from './config';
 
 const DOUBAO_API_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
@@ -35,7 +35,7 @@ const ADA_SYSTEM_PROMPT = `你是"阿搭"，一个懂行的过来人朋友，专
 请根据这个类型，在对话中适当体现对该类型用户的理解和帮助。`;
 
 // 初始化对话
-export function getAdaSystemPrompt(tensionType?: TensionType): string {
+export function getAdaSystemPrompt(tensionType?: TensionLevel): string {
   if (!tensionType) {
     return ADA_SYSTEM_PROMPT.replace('{tensionType}', '未知')
       .replace('{typeName}', '待诊断')
@@ -126,7 +126,7 @@ export async function sendMessageToDoubao(
 // 模拟面试官的回应（本地版本，用于测试）
 export function generateLocalResponse(
   userMessage: string,
-  tensionType?: TensionType
+  tensionType?: TensionLevel
 ): string {
   const responses = [
     '好的，我听到了。说说你具体是怎么准备的呢？',

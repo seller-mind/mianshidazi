@@ -1,5 +1,5 @@
 // 紧张检测工具 - 基于对话数据的紧张信号分析
-import type { TensionSignal, TensionDiagnosis, TensionType } from '../../types';
+import type { TensionSignal, TensionDiagnosis, TensionType, TensionLevel } from '@/types';
 
 // 填充词列表
 const FILLER_WORDS = ['嗯', '啊', '那个', '就是', '的话', '然后', '其实', '可能', '大概', '应该', '我想想', '让我想想', '这个', '怎么说', '怎么说呢'];
@@ -237,7 +237,7 @@ export function diagnoseTensionType(
   const fillerSignal = signals.find(s => s.type === 'filler');
   const lengthSignal = signals.find(s => s.type === 'length');
 
-  let type: TensionType = 'A';
+  let type: TensionLevel = 'A';
   let typeName = '轻度紧张';
   let description = '';
   const suggestions: string[] = [];
@@ -286,6 +286,10 @@ export function diagnoseTensionType(
     tensionIndex,
     description,
     suggestions: suggestions.slice(0, 5), // 最多5条建议
+    overallScore: 0,
+    signals: [],
+    dominantType: null,
+    tips: suggestions.slice(0, 5),
   };
 }
 

@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 验证上下文类型
-    const validContexts: CompanionContext[] = ['深夜', '面试前', '面试后', '等通知', '崩溃急救', '日常'];
+    const validContexts = ['深夜', '面试前', '面试后', '等通知', '崩溃急救', '日常'];
     if (!validContexts.includes(context)) {
       return new Response(
         JSON.stringify({ error: '无效的上下文类型' }),

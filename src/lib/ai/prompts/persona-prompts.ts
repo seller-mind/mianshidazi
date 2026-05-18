@@ -1,4 +1,4 @@
-import { PersonaConfig } from '../../types';
+import { PersonaConfig } from '@/types';
 
 export const PERSONA_CONFIGS: Record<string, PersonaConfig> = {
   A: {

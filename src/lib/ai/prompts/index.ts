@@ -8,7 +8,7 @@ import {
   PERSONA_E_PROMPT,
 } from './persona-prompts';
 import { ADA_SYSTEM_PROMPT, COMPANION_CONTEXT_PROMPTS } from './ada-prompt';
-import type { PersonaType, CompanionContext } from '../../types';
+import type { PersonaType } from '@/types';
 
 export function getPersonaPrompt(persona: PersonaType, interviewType?: string, resume?: string): string {
   let prompt: string;
@@ -48,14 +48,14 @@ export function getPersonaPrompt(persona: PersonaType, interviewType?: string, r
 }
 
 // 获取阿搭陪伴对话的Prompt
-export function getCompanionPrompt(context: CompanionContext): string {
+export function getCompanionPrompt(context: string): string {
   const contextPrompt = COMPANION_CONTEXT_PROMPTS[context] || COMPANION_CONTEXT_PROMPTS['日常'];
   return `${ADA_SYSTEM_PROMPT}\n\n【当前场景】\n${contextPrompt}`;
 }
 
 // 获取带历史消息的阿搭Prompt（用于多轮对话）
 export function getCompanionPromptWithHistory(
-  context: CompanionContext,
+  context: string,
   historyMessages: Array<{ role: string; content: string }>
 ): string {
   const systemPrompt = getCompanionPrompt(context);

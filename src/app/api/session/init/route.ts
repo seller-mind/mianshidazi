@@ -1,6 +1,5 @@
 // 初始化面试会话API - POST /api/session/init
 import { NextRequest } from 'next/server';
-import { v4 as uuidv4 } from 'crypto';
 import type { PersonaType, CompanionContext } from '@/types';
 
 // 会话存储
