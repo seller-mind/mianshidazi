@@ -125,3 +125,52 @@ npm run dev
 ## License
 
 MIT
+
+## Git 部署指南
+
+### 推送到 GitHub
+
+```bash
+# 1. 在 GitHub 创建仓库后，添加 remote
+git remote add origin git@github.com:your-username/mianshidazi.git
+
+# 2. 推送代码
+git branch -M main
+git push -u origin main
+```
+
+### Vercel 部署
+
+1. 在 Vercel 中导入 GitHub 仓库
+2. 添加环境变量（在 Vercel Dashboard → Settings → Environment Variables）
+3. Deploy
+
+### 本地运行
+
+```bash
+# 安装依赖
+npm install
+
+# 启动开发服务器
+npm run dev
+
+# 构建生产版本
+npm run build
+```
+
+## 环境变量清单
+
+| 变量名 | 说明 | 示例 |
+|--------|------|------|
+| NEXT_PUBLIC_SUPABASE_URL | Supabase 项目 URL | https://xxx.supabase.co |
+| NEXT_PUBLIC_SUPABASE_ANON_KEY | Supabase 匿名密钥 | eyJhbG... |
+| DASHSCOPE_API_KEY | 豆包 API 密钥 | sk-dc2a94... |
+| XUNHU_APP_ID | 虎皮椒 App ID | 201906180430 |
+| XUNHU_APP_SECRET | 虎皮椒 App Secret | 7fee1226... |
+
+## 开发说明
+
+- 页面路由：`/` 落地页, `/diagnose` 诊断, `/practice` 练习, `/report` 报告, `/dashboard` 仪表盘
+- 组件目录：`src/components/` 下按功能分组
+- 工具函数：`src/lib/utils.ts`
+- 类型定义：`src/types/index.ts`
