@@ -57,14 +57,18 @@ export default function InterviewChat({ sessionId, persona, interviewType = '通
       }
 
       // 处理SSE流式响应
-      const reader = response.body?.getReader();
+      if (!response.body) {
+        throw new Error('响应体为空，请稍后重试');
+      }
+
+      const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let assistantMessage = '';
 
       const assistantId = (Date.now() + 1).toString();
       setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '' }]);
 
-      while (reader) {
+      while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
@@ -75,11 +79,32 @@ export default function InterviewChat({ sessionId, persona, interviewType = '通
           if (line.startsWith('data: ')) {
             const data = line.slice(6);
             if (data === '[DONE]') {
+              // 检查是否有错误
+              if (!assistantMessage.trim()) {
+                setMessages(prev =>
+                  prev.map(msg =>
+                    msg.id === assistantId
+                      ? { ...msg, content: '抱歉，暂时无法回复，请稍后重试。' }
+                      : msg
+                  )
+                );
+              }
               setIsLoading(false);
               return;
             }
             try {
               const parsed = JSON.parse(data);
+              // 处理错误响应
+              if (parsed.error) {
+                setMessages(prev =>
+                  prev.map(msg =>
+                    msg.id === assistantId
+                      ? { ...msg, content: `出错了: ${parsed.error}` }
+                      : msg
+                  )
+                );
+                break;
+              }
               if (parsed.content) {
                 assistantMessage += parsed.content;
                 setMessages(prev =>
@@ -100,7 +125,7 @@ export default function InterviewChat({ sessionId, persona, interviewType = '通
       console.error('发送消息失败:', error);
       setMessages(prev => [
         ...prev,
-        { id: (Date.now() + 2).toString(), role: 'assistant', content: '抱歉，发送失败了。请稍后重试。' },
+        { id: (Date.now() + 2).toString(), role: 'assistant', content: `抱歉，发送失败了: ${error instanceof Error ? error.message : '请稍后重试'}` },
       ]);
     } finally {
       setIsLoading(false);

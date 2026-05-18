@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { DIAGNOSTIC_QUESTIONS, TENSION_TYPES, calculateDiagnosticResult } from '@/lib/ai/config';
 import { Button, ProgressIndicator, Card } from '@/components/ui';
 import type { DiagnosticAnswer, TensionLevel } from '@/types';
@@ -201,12 +202,12 @@ export default function DiagnosePage() {
       <div className="max-w-2xl mx-auto">
         {/* 顶部导航 */}
         <div className="flex items-center justify-between mb-8">
-          <a href="/" className="flex items-center gap-2 text-[#6B7280] hover:text-[#FF6B35] transition-colors">
+          <Link href="/" className="inline-flex items-center gap-2 text-[#6B7280] hover:text-[#FF6B35] transition-colors">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
             返回
-          </a>
+          </Link>
           <ProgressIndicator current={currentStep} total={DIAGNOSTIC_QUESTIONS.length} />
         </div>
 

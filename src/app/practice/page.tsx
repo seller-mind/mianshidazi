@@ -98,14 +98,18 @@ function PracticeContent() {
       }
 
       // 处理SSE流式响应
-      const reader = response.body?.getReader();
+      if (!response.body) {
+        throw new Error('响应体为空，请稍后重试');
+      }
+
+      const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let assistantMessage = '';
       const assistantId = generateId();
 
       setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '' }]);
 
-      while (reader) {
+      while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
@@ -116,10 +120,31 @@ function PracticeContent() {
           if (line.startsWith('data: ')) {
             const data = line.slice(6);
             if (data === '[DONE]') {
+              // 检查是否有错误
+              if (!assistantMessage.trim()) {
+                setMessages(prev =>
+                  prev.map(msg =>
+                    msg.id === assistantId
+                      ? { ...msg, content: '抱歉，暂时无法回复，请稍后重试。' }
+                      : msg
+                  )
+                );
+              }
               break;
             }
             try {
               const parsed = JSON.parse(data);
+              // 处理错误响应
+              if (parsed.error) {
+                setMessages(prev =>
+                  prev.map(msg =>
+                    msg.id === assistantId
+                      ? { ...msg, content: `出错了: ${parsed.error}` }
+                      : msg
+                  )
+                );
+                break;
+              }
               if (parsed.content) {
                 assistantMessage += parsed.content;
                 setMessages(prev =>
@@ -140,7 +165,7 @@ function PracticeContent() {
       console.error('发送消息失败:', error);
       setMessages(prev => [
         ...prev,
-        { id: generateId(), role: 'assistant', content: '抱歉，出了点问题。请稍后重试。' },
+        { id: generateId(), role: 'assistant', content: `抱歉，出了点问题: ${error instanceof Error ? error.message : '请稍后重试'}` },
       ]);
     } finally {
       setIsLoading(false);

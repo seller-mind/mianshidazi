@@ -1,12 +1,14 @@
-// 豆包 Doubao API 客户端 (V9版)
+// 豆包 Doubao API 客户端 (V9版) - 修复版
 import type { DoubaoResponse } from '../../types';
 
-// V9: 使用正确的豆包API endpoint
-const API_ENDPOINT = process.env.DASHSCOPE_API_ENDPOINT || 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
-const MODEL_ID = process.env.DASHSCOPE_MODEL || 'doubao-1-5-pro-32k';
+// 修复：使用正确的火山方舟 endpoint
+// 旧: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+// 新: https://ark.cn-beijing.volces.com/api/v3/chat/completions
+const API_ENDPOINT = process.env.DASHSCOPE_API_ENDPOINT || 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
+const MODEL_ID = process.env.DASHSCOPE_MODEL || 'Doubao-pro-32k';
 
 // 从环境变量获取API Key
-const API_KEY = process.env.DASHSCOPE_API_KEY || process.env.DASHSCOPE_API_KEY;
+const API_KEY = process.env.DASHSCOPE_API_KEY;
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -69,6 +71,11 @@ export async function chatCompletionStream(
 ): Promise<void> {
   const { temperature = 0.7, maxTokens = 2000 } = options;
 
+  // 检查 API Key
+  if (!API_KEY) {
+    throw new Error('API Key 未配置，请检查环境变量 DASHSCOPE_API_KEY');
+  }
+
   const response = await fetch(API_ENDPOINT, {
     method: 'POST',
     headers: {
@@ -85,8 +92,9 @@ export async function chatCompletionStream(
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`豆包API错误: ${response.status} - ${error}`);
+    const errorText = await response.text();
+    console.error('豆包API错误:', response.status, errorText);
+    throw new Error(`豆包API错误 (${response.status}): ${errorText}`);
   }
 
   if (!response.body) {
@@ -124,8 +132,17 @@ export async function chatCompletionStream(
           if (content) {
             onChunk(content);
           }
-        } catch {
+          
+          // 检查是否有错误
+          if (parsed.error) {
+            throw new Error(parsed.error.message || 'API返回错误');
+          }
+        } catch (parseError) {
           // 忽略解析错误，继续处理下一行
+          // 但如果是已知错误类型，则抛出
+          if (parseError instanceof Error && parseError.message.includes('API返回错误')) {
+            throw parseError;
+          }
         }
       }
     }

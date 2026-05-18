@@ -85,14 +85,18 @@ export default function CompanionPage() {
       }
 
       // 处理SSE流式响应
-      const reader = response.body?.getReader();
+      if (!response.body) {
+        throw new Error('响应体为空，请稍后重试');
+      }
+
+      const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let assistantMessage = '';
       const assistantId = generateId();
 
       setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '' }]);
 
-      while (reader) {
+      while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
@@ -103,22 +107,33 @@ export default function CompanionPage() {
           if (line.startsWith('data: ')) {
             const data = line.slice(6);
             if (data === '[DONE]') {
-              break;
-            }
-            try {
-              const parsed = JSON.parse(data);
-              if (parsed.content) {
-                assistantMessage += parsed.content;
+              // 检查是否有错误
+              if (!assistantMessage.trim()) {
                 setMessages(prev =>
                   prev.map(msg =>
                     msg.id === assistantId
-                      ? { ...msg, content: assistantMessage }
+                      ? { ...msg, content: '抱歉，阿搭打了个盹，请再说一遍～' }
                       : msg
                   )
                 );
               }
+              break;
+            }
+            try {
+              const parsed = JSON.parse(data);
+              // 处理错误响应
               if (parsed.error) {
-                assistantMessage = '抱歉，阿搭打了个盹，请再说一遍～';
+                setMessages(prev =>
+                  prev.map(msg =>
+                    msg.id === assistantId
+                      ? { ...msg, content: `出错了: ${parsed.error}` }
+                      : msg
+                  )
+                );
+                break;
+              }
+              if (parsed.content) {
+                assistantMessage += parsed.content;
                 setMessages(prev =>
                   prev.map(msg =>
                     msg.id === assistantId
@@ -137,7 +152,7 @@ export default function CompanionPage() {
       console.error('发送消息失败:', error);
       setMessages(prev => [
         ...prev,
-        { id: generateId(), role: 'assistant', content: '抱歉，出了点问题。请稍后重试。' },
+        { id: generateId(), role: 'assistant', content: `抱歉，出了点问题: ${error instanceof Error ? error.message : '请稍后重试'}` },
       ]);
     } finally {
       setIsLoading(false);
