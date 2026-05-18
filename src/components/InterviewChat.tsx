@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTTS } from '@/lib/hooks/useTTS';
 import { TTSPlayButton } from '@/components/ui/TTSPlayButton';
+import { AIBadge } from '@/components/AIDisclaimer';
 
 // 消息类型
 interface Message {
@@ -149,6 +150,17 @@ export default function InterviewChat({ sessionId, persona, interviewType = '通
     <div className="flex flex-col h-[600px] max-w-2xl mx-auto border rounded-lg">
       {/* 消息列表 */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* AI内容标识 - 根据《人工智能生成合成内容标识办法》 */}
+        <div className="text-xs text-gray-500 dark:text-gray-400 py-2 px-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800 mb-4">
+          <div className="flex items-center gap-2 mb-1">
+            <AIBadge />
+            <span className="text-[10px]">根据《人工智能生成合成内容标识办法》标注</span>
+          </div>
+          <p className="leading-relaxed">
+            本对话内容由AI生成，仅供参考。AI提供的面试建议不构成专业职业指导或心理治疗建议。
+          </p>
+        </div>
+        
         {messages.length === 0 && (
           <div className="text-center text-gray-500 mt-20">
             <p className="text-lg">👋 你好！</p>
@@ -174,9 +186,14 @@ export default function InterviewChat({ sessionId, persona, interviewType = '通
               className={`max-w-[80%] px-4 py-2 rounded-lg ${
                 msg.role === 'user'
                   ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-800'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
               }`}
             >
+              {msg.role === 'assistant' && (
+                <div className="flex items-center gap-1 mb-1">
+                  <AIBadge />
+                </div>
+              )}
               {msg.content}
             </div>
           </div>

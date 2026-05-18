@@ -7,6 +7,7 @@ import { PERSONA_CONFIGS } from '@/lib/ai/prompts';
 import { Button, Card } from '@/components/ui';
 import { generateId } from '@/lib/utils';
 import type { PersonaType, TensionLevel } from '@/types';
+import { AIBadge } from '@/components/AIDisclaimer';
 
 interface Message {
   id: string;
@@ -328,6 +329,17 @@ function PracticeContent() {
       {/* 消息区域 */}
       <div className="flex-1 overflow-y-auto px-6 py-4">
         <div className="max-w-2xl mx-auto space-y-4">
+          {/* AI内容标识 - 根据《人工智能生成合成内容标识办法》 */}
+          <div className="text-xs text-gray-500 dark:text-gray-400 py-2 px-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800 mb-4">
+            <div className="flex items-center gap-2 mb-1">
+              <AIBadge />
+              <span>根据《人工智能生成合成内容标识办法》标注</span>
+            </div>
+            <p className="leading-relaxed">
+              本对话内容由AI生成，仅供参考。AI提供的面试建议不构成专业职业指导或心理治疗建议。
+            </p>
+          </div>
+          
           {messages.map((msg) => (
             <div
               key={msg.id}
@@ -341,6 +353,11 @@ function PracticeContent() {
                 }`}
                 style={{ whiteSpace: 'pre-wrap' }}
               >
+                {msg.role === 'assistant' && (
+                  <div className="flex items-center gap-1 mb-1">
+                    <AIBadge />
+                  </div>
+                )}
                 {msg.content}
               </div>
             </div>
