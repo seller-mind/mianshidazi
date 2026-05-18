@@ -87,3 +87,19 @@ export interface DiagnosticAnswer {
   selectedOption: number;
   scores: Record<TensionType, number>;
 }
+
+// 面试官人格类型
+export type PersonaType = 'A' | 'B' | 'C' | 'D' | 'E';
+
+// 陪伴对话上下文
+export type CompanionContext = '深夜' | '面试前' | '面试后' | '等通知' | '崩溃急救' | '日常';
+
+// 紧张信号
+export interface TensionSignal {
+  pauseCount: number;
+  avgResponseTime: number;
+  fillerWordCount: number;
+  responseLength: number;
+  tensionIndex: number;
+  timestamp: Date;
+}

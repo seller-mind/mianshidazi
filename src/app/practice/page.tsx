@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { TENSION_TYPES } from '@/lib/ai/config';
 import { generateLocalResponse } from '@/lib/ai/chat';
@@ -8,7 +8,7 @@ import { ChatBubble, Button, AdaAvatar, Card } from '@/components/ui';
 import type { ChatMessage, TensionType } from '@/types';
 import { generateId } from '@/lib/utils';
 
-export default function PracticePage() {
+function PracticeContent() {
   const searchParams = useSearchParams();
   const tensionType = (searchParams.get('type') as TensionType) || undefined;
   const tensionIndex = searchParams.get('tension');
@@ -203,5 +203,22 @@ export default function PracticePage() {
         </div>
       </footer>
     </main>
+  );
+}
+
+export default function PracticePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-b from-white to-orange-50 dark:from-[#1A1A2E] dark:to-[#252542] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-[#FF6B35] to-[#E55A28] flex items-center justify-center text-white text-2xl font-bold animate-pulse">
+            阿
+          </div>
+          <p className="mt-4 text-[#6B7280]">正在加载...</p>
+        </div>
+      </div>
+    }>
+      <PracticeContent />
+    </Suspense>
   );
 }

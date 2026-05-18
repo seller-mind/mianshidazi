@@ -1,11 +1,12 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { TENSION_TYPES } from '@/lib/ai/config';
 import { Button, Card, TensionMeter } from '@/components/ui';
 import type { TensionType } from '@/types';
 
-export default function ReportPage() {
+function ReportContent() {
   const searchParams = useSearchParams();
   const tensionType = (searchParams.get('type') as TensionType) || 'A';
   const tensionIndex = parseInt(searchParams.get('tension') || '65', 10);
@@ -130,5 +131,17 @@ export default function ReportPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function ReportPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-b from-white to-orange-50 dark:from-[#1A1A2E] dark:to-[#252542] flex items-center justify-center">
+        <p className="text-[#6B7280]">正在加载报告...</p>
+      </div>
+    }>
+      <ReportContent />
+    </Suspense>
   );
 }
