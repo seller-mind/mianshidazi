@@ -68,16 +68,16 @@ export function HeroSection() {
         {/* 社会证明 */}
         <div className="flex flex-wrap justify-center gap-8 text-sm text-[#9CA3AF]">
           <div className="flex items-center gap-2">
-            <span className="text-[#FF6B35] font-semibold">10,000+</span>
-            <span>人已诊断</span>
+            <span className="text-[#FF6B35] font-semibold">5种</span>
+            <span>紧张类型</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[#FF6B35] font-semibold">85%</span>
-            <span>紧张指数下降</span>
+            <span className="text-[#FF6B35] font-semibold">5种</span>
+            <span>面试官人格</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[#FF6B35] font-semibold">4.9</span>
-            <span>用户评分</span>
+            <span className="text-[#FF6B35] font-semibold">免费</span>
+            <span>紧张诊断</span>
           </div>
         </div>
       </div>

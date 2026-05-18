@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     const priceMap: Record<string, number> = {
       single: 9.9,
       monthly: 49,
-      quarterly: 129,
+      quarterly: 119,
     };
 
     const price = priceMap[planId];

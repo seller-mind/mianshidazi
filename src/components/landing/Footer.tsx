@@ -37,9 +37,6 @@ export default function Footer({ showNavigation = true }: FooterProps) {
           <p className="mt-2 text-xs text-gray-500">
             AI面试建议仅供参考，不构成专业职业指导或心理治疗建议
           </p>
-          <p className="mt-1 text-xs text-gray-600">
-            ICP备案号：待完成 | 公安联网备案：待完成
-          </p>
         </div>
       </div>
     </footer>
