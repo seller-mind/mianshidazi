@@ -1,164 +1,110 @@
 'use client';
 
-import { useState } from 'react';
-import { Button } from '@/components/ui';
+import Link from 'next/link';
 
 export function ProductShowcaseSection() {
-  const [activeTab, setActiveTab] = useState<'diagnose' | 'practice'>('diagnose');
+  // V9 核心功能展示
+  const features = [
+    {
+      emoji: '🔬',
+      title: '紧张类型诊断',
+      description: '5种紧张类型，精准定位你的问题根源。不是泛泛的"放松点"，是针对性的解决方案。',
+      color: 'from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20',
+      tag: '灵魂功能',
+    },
+    {
+      emoji: '🤖',
+      title: 'AI面试官',
+      description: '5种人格可选：温柔鼓励型帮你建立信心，真实模拟型帮你适应节奏，压力挑战型帮你脱敏。',
+      color: 'from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20',
+      tag: '核心功能',
+    },
+    {
+      emoji: '💬',
+      title: '阿搭陪伴聊天',
+      description: '面试前、面试后、等通知焦虑、崩溃时刻——阿搭都在。不是AI客服，是懂行的朋友。',
+      color: 'from-pink-50 to-rose-50 dark:from-pink-900/20 dark:to-rose-900/20',
+      tag: '情感陪伴',
+    },
+    {
+      emoji: '📊',
+      title: '面试练习报告',
+      description: '练习结束后自动生成报告：表现分 vs 真实水平、紧张偷走了多少分、下一步建议。',
+      color: 'from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20',
+      tag: '进步可见',
+    },
+    {
+      emoji: '🎭',
+      title: 'KPI面识别',
+      description: '教你识别"等两小时面十分钟"不是你的问题。前程无忧数据支撑，不是编的。',
+      color: 'from-purple-50 to-violet-50 dark:from-purple-900/20 dark:to-violet-900/20',
+      tag: '独家功能',
+    },
+    {
+      emoji: '🧠',
+      title: '真实知识来源',
+      description: '阿搭说的每句话都有真实来源：脉脉HR分享、前程无忧调查、哈佛研究。加持你的面试。',
+      color: 'from-cyan-50 to-teal-50 dark:from-cyan-900/20 dark:to-teal-900/20',
+      tag: 'V9新增',
+    },
+  ];
 
   return (
-    <section className="py-20 px-6 bg-white dark:bg-[#1A1A2E]">
+    <section className="py-20 px-6 bg-gradient-to-b from-white to-gray-50 dark:from-[#1A1A2E] dark:to-[#252542]">
       <div className="max-w-4xl mx-auto">
         {/* 标题 */}
-        <div className="text-center mb-12">
+        <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-bold text-[#1F2937] dark:text-white mb-4">
-            阿搭能帮你做什么
+            阿搭能帮你做什么？
           </h2>
           <p className="text-lg text-[#6B7280] dark:text-gray-400">
-            两个核心功能，直击面试紧张
+            不是给你答案，是帮你不再紧张
           </p>
         </div>
 
-        {/* Tab切换 */}
-        <div className="flex justify-center mb-8">
-          <div className="inline-flex bg-gray-100 dark:bg-[#252542] rounded-xl p-1">
-            <button
-              onClick={() => setActiveTab('diagnose')}
-              className={`px-6 py-2 rounded-lg font-medium transition-all ${
-                activeTab === 'diagnose'
-                  ? 'bg-white dark:bg-[#374151] text-[#FF6B35] shadow-sm'
-                  : 'text-[#6B7280] hover:text-[#1F2937] dark:hover:text-white'
-              }`}
+        {/* 功能卡片 */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {features.map((feature, index) => (
+            <div
+              key={index}
+              className={`bg-gradient-to-br ${feature.color} rounded-2xl p-6 border border-gray-100 dark:border-gray-800 hover:shadow-lg transition-shadow relative`}
             >
-              紧张类型诊断
-            </button>
-            <button
-              onClick={() => setActiveTab('practice')}
-              className={`px-6 py-2 rounded-lg font-medium transition-all ${
-                activeTab === 'practice'
-                  ? 'bg-white dark:bg-[#374151] text-[#FF6B35] shadow-sm'
-                  : 'text-[#6B7280] hover:text-[#1F2937] dark:hover:text-white'
-              }`}
-            >
-              AI面试练习
-            </button>
-          </div>
+              {/* 标签 */}
+              <div className="absolute top-4 right-4">
+                <span className="px-2 py-1 bg-white/80 dark:bg-[#1A1A2E]/80 text-[#FF6B35] text-xs font-medium rounded-full">
+                  {feature.tag}
+                </span>
+              </div>
+
+              <span className="text-3xl mb-4 block">{feature.emoji}</span>
+              <h3 className="text-lg font-semibold text-[#1F2937] dark:text-white mb-2">
+                {feature.title}
+              </h3>
+              <p className="text-sm text-[#6B7280] dark:text-gray-400 leading-relaxed">
+                {feature.description}
+              </p>
+            </div>
+          ))}
         </div>
 
-        {/* 诊断预览 */}
-        {activeTab === 'diagnose' && (
-          <div className="animate-fade-in">
-            <div className="bg-gradient-to-br from-[#F9FAFB] to-orange-50 dark:from-[#252542] dark:to-[#1A1A2E] rounded-3xl p-8 border border-gray-100 dark:border-gray-800">
-              {/* 模拟诊断对话 */}
-              <div className="space-y-6 max-w-md">
-                {/* 阿搭消息 */}
-                <div className="flex gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B35] to-[#E55A28] flex items-center justify-center text-white font-medium flex-shrink-0">
-                    阿
-                  </div>
-                  <div className="bg-white dark:bg-[#374151] rounded-2xl rounded-tl-md p-4 shadow-sm max-w-[80%]">
-                    <p className="text-[#1F2937] dark:text-white text-sm leading-relaxed">
-                      我猜你面试的时候...是那种脑子一片空白，还是身体先开始抖？
-                    </p>
-                  </div>
-                </div>
-
-                {/* 用户选项 */}
-                <div className="flex flex-wrap gap-2 ml-13">
-                  {['脑子空白，想不起来', '身体先抖，心跳加速', '不敢看面试官', '都有...'].map((option, i) => (
-                    <button
-                      key={i}
-                      className="px-4 py-2 bg-white dark:bg-[#374151] rounded-full text-sm text-[#6B7280] dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:border-[#FF6B35] hover:text-[#FF6B35] transition-colors"
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-
-                {/* 结果预览 */}
-                <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#FF6B35] to-[#E55A28] flex items-center justify-center text-white font-bold text-xl">
-                      A
-                    </div>
-                    <div>
-                      <p className="text-sm text-[#6B7280] dark:text-gray-400">你的紧张类型</p>
-                      <p className="text-lg font-semibold text-[#1F2937] dark:text-white">脑暴型紧张</p>
-                      <p className="text-sm text-[#FF6B35]">紧张指数 72%</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* CTA */}
-              <div className="mt-8 text-center">
-                <Button>开始诊断</Button>
-              </div>
-            </div>
+        {/* 练习入口 */}
+        <div className="mt-12 text-center">
+          <p className="text-[#6B7280] dark:text-gray-400 mb-4">
+            准备好开始练习了吗？
+          </p>
+          <div className="flex flex-wrap justify-center gap-4">
+            <Link href="/diagnose">
+              <button className="px-6 py-3 bg-[#FF6B35] text-white font-medium rounded-xl hover:bg-[#E55A28] transition-colors">
+                🔍 先做紧张类型诊断
+              </button>
+            </Link>
+            <Link href="/practice">
+              <button className="px-6 py-3 bg-white dark:bg-[#252542] text-[#1F2937] dark:text-white font-medium rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-[#2A2A45] transition-colors">
+                🤖 直接开始AI面试练习
+              </button>
+            </Link>
           </div>
-        )}
-
-        {/* 练习预览 */}
-        {activeTab === 'practice' && (
-          <div className="animate-fade-in">
-            <div className="bg-gradient-to-br from-[#F9FAFB] to-orange-50 dark:from-[#252542] dark:to-[#1A1A2E] rounded-3xl p-8 border border-gray-100 dark:border-gray-800">
-              {/* 模拟对话 */}
-              <div className="space-y-4 max-w-md">
-                {/* 阿搭消息 */}
-                <div className="flex gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B35] to-[#E55A28] flex items-center justify-center text-white font-medium flex-shrink-0">
-                    阿
-                  </div>
-                  <div className="bg-white dark:bg-[#374151] rounded-2xl rounded-tl-md p-4 shadow-sm max-w-[80%]">
-                    <p className="text-[#1F2937] dark:text-white text-sm leading-relaxed">
-                      好的，那我们来模拟一下。介绍一下你自己吧，从哪里开始都行。
-                    </p>
-                  </div>
-                </div>
-
-                {/* 用户消息 */}
-                <div className="flex gap-3 justify-end">
-                  <div className="bg-[#FF6B35] text-white rounded-2xl rounded-tr-md p-4 max-w-[80%]">
-                    <p className="text-sm leading-relaxed">
-                      我叫小明，毕业于XX大学，之前在YY公司做产品助理...
-                    </p>
-                  </div>
-                </div>
-
-                {/* 阿搭追问 */}
-                <div className="flex gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B35] to-[#E55A28] flex items-center justify-center text-white font-medium flex-shrink-0">
-                    阿
-                  </div>
-                  <div className="bg-white dark:bg-[#374151] rounded-2xl rounded-tl-md p-4 shadow-sm max-w-[80%]">
-                    <p className="text-[#1F2937] dark:text-white text-sm leading-relaxed">
-                      追问一下，你在YY公司最有成就感的一个项目是什么？
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* 功能特点 */}
-              <div className="mt-8 grid grid-cols-3 gap-4">
-                {[
-                  { icon: '🎯', label: '追问式练习' },
-                  { icon: '📊', label: '实时反馈' },
-                  { icon: '📝', label: '面试报告' },
-                ].map((feature, i) => (
-                  <div key={i} className="text-center">
-                    <div className="text-2xl mb-2">{feature.icon}</div>
-                    <p className="text-sm text-[#6B7280] dark:text-gray-400">{feature.label}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* CTA */}
-              <div className="mt-8 text-center">
-                <Button variant="outline">免费试练一次</Button>
-              </div>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
     </section>
   );

@@ -1,11 +1,12 @@
-// 豆包 Doubao API 客户端
+// 豆包 Doubao API 客户端 (V9版)
 import type { DoubaoResponse } from '../../types';
 
-const API_ENDPOINT = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
-const MODEL_ID = 'ep-20260515144642-96m6k';
+// V9: 使用正确的豆包API endpoint
+const API_ENDPOINT = process.env.DASHSCOPE_API_ENDPOINT || 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
+const MODEL_ID = process.env.DASHSCOPE_MODEL || 'doubao-1-5-pro-32k';
 
-// 从环境变量获取API Key，如果没有则使用默认值（仅用于开发）
-const API_KEY = process.env.DASHSCOPE_API_KEY;
+// 从环境变量获取API Key
+const API_KEY = process.env.DASHSCOPE_API_KEY || process.env.DASHSCOPE_API_KEY;
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -117,7 +118,8 @@ export async function chatCompletionStream(
 
         try {
           const parsed = JSON.parse(data);
-          const content = parsed.choices?.[0]?.delta?.content;
+          // 处理豆包API的响应格式
+          const content = parsed.choices?.[0]?.delta?.content || parsed.choices?.[0]?.message?.content;
           
           if (content) {
             onChunk(content);

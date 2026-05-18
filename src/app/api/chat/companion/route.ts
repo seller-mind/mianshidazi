@@ -1,4 +1,4 @@
-// 阿搭陪伴对话API - POST /api/chat/companion
+// 阿搭陪伴对话API - POST /api/chat/companion (V9版)
 import { NextRequest } from 'next/server';
 import { chatCompletionStream, buildCompanionMessages } from '@/lib/ai/client';
 import { getCompanionPromptWithHistory } from '@/lib/ai/prompts';
@@ -7,7 +7,8 @@ import type { CompanionContext } from '@/types';
 // 存储阿搭陪伴会话上下文
 const companionContexts: Map<string, {
   messages: Array<{ role: string; content: string }>;
-  context: CompanionContext;
+  context: string;
+  startTime: number;
 }> = new Map();
 
 export async function POST(request: NextRequest) {
@@ -16,39 +17,35 @@ export async function POST(request: NextRequest) {
     const { message, context, sessionId } = body;
 
     // 验证必填参数
-    if (!message || !context || !sessionId) {
+    if (!message || !sessionId) {
       return new Response(
-        JSON.stringify({ error: '缺少必要参数: message, context, sessionId' }),
+        JSON.stringify({ error: '缺少必要参数: message, sessionId' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
     // 验证上下文类型
     const validContexts = ['深夜', '面试前', '面试后', '等通知', '崩溃急救', '日常'];
-    if (!validContexts.includes(context)) {
-      return new Response(
-        JSON.stringify({ error: '无效的上下文类型' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
+    const validContext = validContexts.includes(context) ? context : '日常';
 
     // 获取或创建会话上下文
     let companionContext = companionContexts.get(sessionId);
     if (!companionContext) {
       companionContext = {
         messages: [],
-        context,
+        context: validContext,
+        startTime: Date.now(),
       };
       companionContexts.set(sessionId, companionContext);
     }
 
     // 更新上下文
-    companionContext.context = context;
+    companionContext.context = validContext;
 
-    // 构建Prompt（包含历史消息）
-    const systemPrompt = getCompanionPromptWithHistory(context, companionContext.messages);
+    // 构建Prompt（包含历史消息）V9版
+    const systemPrompt = getCompanionPromptWithHistory(validContext, companionContext.messages);
 
-    // 简化版消息格式（阿搭不需要面试官的系统Prompt）
+    // 简化版消息格式
     const messages = [
       { role: 'system' as const, content: systemPrompt },
       ...companionContext.messages.map(m => ({

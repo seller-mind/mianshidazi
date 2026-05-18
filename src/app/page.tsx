@@ -12,7 +12,7 @@ import {
 export default function HomePage() {
   return (
     <main className="min-h-screen">
-      {/* 导航栏 */}
+      {/* 导航栏 - V9更新 */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-[#1A1A2E]/80 backdrop-blur-md border-b border-gray-100 dark:border-gray-800">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
@@ -27,7 +27,10 @@ export default function HomePage() {
               免费诊断
             </Link>
             <Link href="/practice" className="text-sm text-[#6B7280] hover:text-[#FF6B35] transition-colors">
-              练习面试
+              AI练习
+            </Link>
+            <Link href="/companion" className="text-sm text-[#6B7280] hover:text-[#FF6B35] transition-colors">
+              阿搭聊天
             </Link>
             <Link 
               href="/diagnose" 
@@ -39,7 +42,7 @@ export default function HomePage() {
         </div>
       </nav>
 
-      {/* 五屏落地页 */}
+      {/* 五屏落地页 - V9更新 */}
       <HeroSection />
       <PainPointSection />
       <CounterintuitiveSection />
@@ -60,12 +63,16 @@ export default function HomePage() {
             <div className="flex gap-6 text-sm">
               <Link href="/diagnose" className="hover:text-white transition-colors">紧张类型诊断</Link>
               <Link href="/practice" className="hover:text-white transition-colors">AI面试练习</Link>
+              <Link href="/companion" className="hover:text-white transition-colors">阿搭聊天</Link>
               <Link href="/report" className="hover:text-white transition-colors">面试报告</Link>
             </div>
           </div>
           
           <div className="mt-8 pt-8 border-t border-gray-800 text-center text-sm">
             <p>&copy; 2025 面试搭子 mianshidazi.com. All rights reserved.</p>
+            <p className="mt-2 text-xs text-gray-500">
+              阿搭说的每句话，都有真实的来源
+            </p>
           </div>
         </div>
       </footer>
