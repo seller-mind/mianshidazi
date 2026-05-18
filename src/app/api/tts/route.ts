@@ -1,16 +1,33 @@
 // TTS 语音合成 API - POST /api/tts
-// 使用阿里云百炼 DashScope CosyVoice API
+// 使用微软 Edge TTS (完全免费)
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getVoiceForPersona, getCompanionVoice } from '@/lib/tts/voice-config';
+import { tts, getVoices } from '@/lib/tts/edge-tts-shim';
 
-// DashScope API 配置
-const DASHSCOPE_API_URL = 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text2audio/generation';
+// GET 请求 - 返回可用音色列表
+export async function GET() {
+  try {
+    const voices = await getVoices();
+    // 过滤出中文音色
+    const chineseVoices = voices.filter((v: { Locale: string }) => v.Locale.startsWith('zh-'));
+    return NextResponse.json({
+      success: true,
+      voices: chineseVoices,
+    });
+  } catch (error) {
+    console.error('Failed to get voices:', error);
+    return NextResponse.json(
+      { error: '获取音色列表失败' },
+      { status: 500 }
+    );
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { text, voice, persona, isCompanion } = body;
+    const { text, voice, persona, isCompanion, rate, pitch } = body;
 
     // 验证必填参数
     if (!text) {
@@ -20,7 +37,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 获取音色
+    // 获取音色 - 优先使用指定的 voice 参数，其次根据 persona/companion 选择
     let voiceId: string;
     if (voice) {
       voiceId = voice;
@@ -30,66 +47,31 @@ export async function POST(request: NextRequest) {
       voiceId = getVoiceForPersona(persona || 'A').voice;
     }
 
-    // 获取 API Key
-    const apiKey = process.env.DASHSCOPE_API_KEY;
-    if (!apiKey) {
-      console.error('DASHSCOPE_API_KEY is not configured');
-      return NextResponse.json(
-        { error: 'TTS 服务未配置，请联系管理员' },
-        { status: 500 }
-      );
+    // 构建 tts 选项
+    const ttsOptions: { voice: string; rate?: string; pitch?: string } = {
+      voice: voiceId,
+    };
+
+    // 添加语速和音调调整（可选参数）
+    if (rate) {
+      ttsOptions.rate = rate;
+    }
+    if (pitch) {
+      ttsOptions.pitch = pitch;
     }
 
-    // 调用 DashScope API
-    const response = await fetch(DASHSCOPE_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'cosyvoice-v3-flash',
-        input: {
-          text: text,
-        },
-        parameters: {
-          voice: voiceId,
-          format: 'mp3',
-          sample_rate: 22050,
-          volume: 50,
-          rate: 1,
-          pitch: 1,
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('DashScope API error:', response.status, errorText);
-      
-      // 检查是否是配额问题
-      if (response.status === 429) {
-        return NextResponse.json(
-          { error: 'TTS 配额已用尽，请稍后再试' },
-          { status: 429 }
-        );
-      }
-      
-      return NextResponse.json(
-        { error: 'TTS 服务调用失败，请稍后重试' },
-        { status: response.status }
-      );
-    }
-
-    // 获取音频数据
-    const audioBuffer = await response.arrayBuffer();
+    // 调用 edge-tts 生成音频 (返回 Node.js Buffer)
+    const audioBuffer = await tts(text, ttsOptions);
+    
+    // 将 Node.js Buffer 转换为 Uint8Array 以供 NextResponse 使用
+    const uint8Array = new Uint8Array(audioBuffer);
 
     // 返回音频流
-    return new NextResponse(audioBuffer, {
+    return new NextResponse(uint8Array, {
       status: 200,
       headers: {
         'Content-Type': 'audio/mpeg',
-        'Content-Length': audioBuffer.byteLength.toString(),
+        'Content-Length': uint8Array.byteLength.toString(),
         'Cache-Control': 'private, max-age=3600',
       },
     });

@@ -1,70 +1,82 @@
-// TTS 音色配置 - 根据面试官人格匹配最合适的音色
+// TTS 音色配置 - 根据面试官人格匹配最合适的 edge-tts 音色
+// edge-tts 是微软提供的免费 TTS 服务，完全免费无限制
 
 /**
- * CosyVoice v3-flash/v3-plus 音色列表（部分）
- * 完整列表请参考：https://help.aliyun.com/zh/model-studio/cosyvoice-voice-list
+ * edge-tts 中文音色列表（常用）
+ * 完整列表可通过 GET /api/tts 获取
  * 
- * 音色命名规则：
- * - v3结尾：cosyvoice-v3-flash/cosyvoice-v3-plus 使用
- * - v2结尾：cosyvoice-v2 使用
- * - 无后缀：cosyvoice-v1 使用
+ * 音色风格说明：
+ * - XiaoxiaoNeural: 温柔女声，适合鼓励型人格
+ * - YunxiNeural: 磁性男声，适合压力挑战型
+ * - XiaoyiNeural: 活泼女声
+ * - XiaohanNeural: 知性女声
+ * - XiaomoNeural: 成熟女声
+ * - YunfengNeural: 成熟男声
+ * - YunyangNeural: 新闻播报男声
+ * - XiaochenNeural: 温柔女声
+ * - XiaoruiNeural: 沉稳女声
+ * - XiaoxuanNeural: 温柔女声
  */
 
-// 面试官人格对应的音色
-export const PERSONA_VOICE_MAP: Record<string, {
+// 面试官人格对应的 edge-tts 音色
+export const EDGE_VOICE_MAP: Record<string, {
   voice: string;
   name: string;
   description: string;
 }> = {
-  // 温柔鼓励型 - 温柔淡定的女声，耐心温暖
+  // 温柔鼓励型 - 温柔女声，耐心温暖
   A: {
-    voice: 'longyingtao_v3',
-    name: '龙应桃',
-    description: '温柔淡定女，25-30岁',
+    voice: 'zh-CN-XiaoxiaoNeural',
+    name: '晓晓',
+    description: '温柔女声，耐心温暖',
   },
-  // 真实模拟型 - 博才干练的男声，专业冷静
+  // 真实模拟型 - 新闻播报男声，专业冷静
   B: {
-    voice: 'longshuo_v2',
-    name: '龙硕',
-    description: '博才干练男，新闻播报风格',
+    voice: 'zh-CN-YunyangNeural',
+    name: '云扬',
+    description: '新闻播报男声，专业冷静',
   },
   // 压力挑战型 - 磁性低音男声，有压迫感
   C: {
-    voice: 'longxiaocheng_v2',
-    name: '龙小诚',
-    description: '磁性低音男，睿智深沉',
+    voice: 'zh-CN-YunxiNeural',
+    name: '云希',
+    description: '磁性低音男声，睿智深沉',
   },
-  // 犀利毒舌型 - 利落从容的女声，干练直接
+  // 犀利毒舌型 - 成熟女声，干练直接
   D: {
-    voice: 'longanli_v3',
-    name: '龙安莉',
-    description: '利落从容女，25-35岁',
+    voice: 'zh-CN-XiaomoNeural',
+    name: '晓墨',
+    description: '成熟女声，干练直接',
   },
-  // HR老油条型 - 激情推销男声，油腔滑调
+  // HR老油条型 - 圆滑男声
   E: {
-    voice: 'longanchong_v3',
-    name: '龙安冲',
-    description: '激情推销男，直播带货风格',
+    voice: 'zh-CN-YunfengNeural',
+    name: '云风',
+    description: '成熟男声，沉稳老练',
   },
 };
 
-// 阿搭陪伴音色 - 温暖亲切
-export const COMPANION_VOICE = {
-  voice: 'longhua_v3',
-  name: '龙华',
-  description: '元气甜美女，20-25岁，像朋友聊天',
+// 阿搭陪伴音色 - 温暖亲切女声
+export const COMPANION_EDGE_VOICE = {
+  voice: 'zh-CN-XiaoyiNeural',
+  name: '小艺',
+  description: '活泼女声，像朋友聊天',
 };
+
+// 保持向后兼容的旧接口
+export const PERSONA_VOICE_MAP = EDGE_VOICE_MAP;
+export const COMPANION_VOICE = COMPANION_EDGE_VOICE;
 
 /**
- * 获取指定人格对应的音色
+ * 获取指定人格对应的 edge-tts 音色
  */
 export function getVoiceForPersona(persona: string): { voice: string; name: string; description: string } {
-  return PERSONA_VOICE_MAP[persona] || PERSONA_VOICE_MAP['A'];
+  return EDGE_VOICE_MAP[persona] || EDGE_VOICE_MAP['A'];
 }
 
 /**
- * 获取阿搭陪伴的音色
+ * 获取阿搭陪伴的 edge-tts 音色
  */
 export function getCompanionVoice(): { voice: string; name: string; description: string } {
-  return COMPANION_VOICE;
+  return COMPANION_EDGE_VOICE;
 }
