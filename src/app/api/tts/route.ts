@@ -45,7 +45,7 @@ function cleanText(text: string): string {
     .trim();
 }
 
-function truncateText(text: string, maxLen = 250): string {
+function truncateText(text: string, maxLen = 150): string {
   if (text.length <= maxLen) return text;
   const truncated = text.substring(0, maxLen);
   const lastPunc = Math.max(
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
   const persona = searchParams.get('persona') || 'A';
   const isCompanion = searchParams.get('isCompanion') === 'true';
 
-  const text = truncateText(cleanText(rawText), 250);
+  const text = truncateText(cleanText(rawText), 150);
   if (!text) {
     return NextResponse.json({ error: '没有可朗读的内容' }, { status: 400 });
   }

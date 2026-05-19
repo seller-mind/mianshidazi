@@ -40,7 +40,7 @@ function cleanText(text: string): string {
     .trim();
 }
 
-function truncateText(text: string, maxLen = 250): string {
+function truncateText(text: string, maxLen = 150): string {
   if (text.length <= maxLen) return text;
   const truncated = text.substring(0, maxLen);
   const lastPunc = Math.max(
