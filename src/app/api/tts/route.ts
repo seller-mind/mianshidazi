@@ -1,8 +1,6 @@
 // TTS API - 阿里云百炼 CosyVoice
-// 返回 JSON { url, urls, error } 格式
-// 短文本（<200字）: 返回单个 { url }
-// 长文本（>=200字）: 返回 { urls: [...] } 多段音频URL
-// 客户端 Audio 直接播放，避免服务端代理下载超时
+// 返回 JSON { url, error } 格式
+// 单次请求整段文本，返回音频URL，客户端Audio直接播放
 
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -46,7 +44,7 @@ function cleanText(text: string): string {
     .trim();
 }
 
-function truncateText(text: string, maxLen = 800): string {
+function truncateText(text: string, maxLen = 500): string {
   if (text.length <= maxLen) return text;
   const truncated = text.substring(0, maxLen);
   const lastPunc = Math.max(
@@ -57,91 +55,12 @@ function truncateText(text: string, maxLen = 800): string {
   return truncated + '…';
 }
 
-// 按标点分段，每段不超过maxChars
-function splitText(text: string, maxChars = 150): string[] {
-  if (text.length <= maxChars) return [text];
-
-  const segments: string[] = [];
-  let remaining = text;
-
-  while (remaining.length > 0) {
-    if (remaining.length <= maxChars) {
-      segments.push(remaining);
-      break;
-    }
-
-    // 在maxChars内找最后一个句号/问号/感叹号
-    let splitPos = -1;
-    for (let i = Math.min(remaining.length - 1, maxChars); i >= Math.max(0, maxChars * 0.4); i--) {
-      if ('。！？；'.includes(remaining[i])) {
-        splitPos = i + 1;
-        break;
-      }
-    }
-
-    // 没找到句号，找逗号
-    if (splitPos === -1) {
-      for (let i = Math.min(remaining.length - 1, maxChars); i >= Math.max(0, maxChars * 0.4); i--) {
-        if ('，、'.includes(remaining[i])) {
-          splitPos = i + 1;
-          break;
-        }
-      }
-    }
-
-    // 还没找到，硬切
-    if (splitPos === -1) {
-      splitPos = maxChars;
-    }
-
-    segments.push(remaining.substring(0, splitPos));
-    remaining = remaining.substring(splitPos);
-  }
-
-  return segments;
-}
-
-// 单段合成
-async function synthesizeOne(text: string, voice: string, signal: AbortSignal): Promise<string> {
-  const response = await fetch(TTS_URL, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${DASHSCOPE_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'cosyvoice-v3-flash',
-      input: { text, voice, format: 'mp3', sample_rate: 22050, rate: 1.0 },
-    }),
-    signal,
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('CosyVoice error:', response.status, errorText.substring(0, 300));
-    throw new Error(`语音合成失败: ${response.status}`);
-  }
-
-  const contentType = response.headers.get('content-type') || '';
-
-  if (contentType.includes('application/json')) {
-    const json = await response.json();
-    const audioUrl = json?.output?.audio?.url;
-    if (audioUrl) {
-      return audioUrl.replace(/^http:/, 'https:');
-    }
-    throw new Error('语音合成未返回音频URL');
-  }
-
-  throw new Error('语音合成返回格式异常');
-}
-
 async function synthesize(text: string, persona?: string, isCompanion?: boolean): Promise<NextResponse> {
   if (!DASHSCOPE_API_KEY) {
     return NextResponse.json({ error: 'TTS API Key 未配置' }, { status: 500 });
   }
 
-  const clean = truncateText(cleanText(text), 800);
+  const clean = truncateText(cleanText(text), 500);
   if (!clean) {
     return NextResponse.json({ error: '没有可朗读的内容' }, { status: 400 });
   }
@@ -149,26 +68,52 @@ async function synthesize(text: string, persona?: string, isCompanion?: boolean)
   const voiceConfig = isCompanion ? COMPANION_VOICE : (PERSONA_VOICE[persona || 'A'] || PERSONA_VOICE['A']);
 
   const controller = new AbortController();
-  // 总超时25秒（分段并行，Vercel Hobby实际限制约10s但并行请求可能更快）
-  const timeoutId = setTimeout(() => controller.abort(), 25000);
+  const timeoutId = setTimeout(() => controller.abort(), 9000);
 
   try {
-    const segments = splitText(clean, 150);
-
-    // 短文本：单次请求
-    if (segments.length === 1) {
-      const url = await synthesizeOne(segments[0], voiceConfig.voice, controller.signal);
-      clearTimeout(timeoutId);
-      return NextResponse.json({ url });
-    }
-
-    // 长文本：分段并行请求
-    const results = await Promise.all(
-      segments.map(seg => synthesizeOne(seg, voiceConfig.voice, controller.signal))
-    );
+    const response = await fetch(TTS_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${DASHSCOPE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'cosyvoice-v3-flash',
+        input: { text: clean, voice: voiceConfig.voice, format: 'mp3', sample_rate: 22050, rate: 1.0 },
+      }),
+      signal: controller.signal,
+    });
 
     clearTimeout(timeoutId);
-    return NextResponse.json({ urls: results });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('CosyVoice error:', response.status, errorText.substring(0, 500));
+      return NextResponse.json({ error: '语音合成失败' }, { status: 500 });
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+
+    // CosyVoice返回JSON（含音频URL）
+    if (contentType.includes('application/json')) {
+      const json = await response.json();
+      const audioUrl = json?.output?.audio?.url;
+      if (audioUrl) {
+        return NextResponse.json({ url: audioUrl.replace(/^http:/, 'https:') });
+      }
+      console.error('CosyVoice no URL:', JSON.stringify(json).substring(0, 500));
+      return NextResponse.json({ error: '语音合成返回异常' }, { status: 500 });
+    }
+
+    // 兜底：直接返回音频
+    if (contentType.includes('audio') || contentType.includes('octet-stream')) {
+      const buf = await response.arrayBuffer();
+      return new NextResponse(buf, {
+        headers: { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'public, max-age=86400' },
+      });
+    }
+
+    return NextResponse.json({ error: '语音合成返回格式异常' }, { status: 500 });
 
   } catch (err: unknown) {
     clearTimeout(timeoutId);
@@ -176,7 +121,7 @@ async function synthesize(text: string, persona?: string, isCompanion?: boolean)
     if (error.name === 'AbortError') {
       return NextResponse.json({ error: '语音合成超时' }, { status: 504 });
     }
-    console.error('TTS synthesize error:', error.message);
+    console.error('TTS error:', error.message);
     return NextResponse.json({ error: error.message || '语音合成失败' }, { status: 500 });
   }
 }
@@ -186,7 +131,6 @@ export async function GET(request: NextRequest) {
   const text = searchParams.get('text') || '';
   const persona = searchParams.get('persona') || 'A';
   const isCompanion = searchParams.get('isCompanion') === 'true';
-
   return synthesize(text, persona, isCompanion);
 }
 
