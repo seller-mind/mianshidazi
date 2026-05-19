@@ -137,8 +137,8 @@ async function synthesize(text: string, persona?: string, isCompanion?: boolean)
   const voiceConfig = isCompanion ? COMPANION_VOICE : (PERSONA_VOICE[persona || 'A'] || PERSONA_VOICE['A']);
 
   const controller = new AbortController();
-  // 总超时20秒（分段并行，需要更多时间）
-  const timeoutId = setTimeout(() => controller.abort(), 20000);
+  // 总超时25秒（分段并行，Vercel Hobby实际限制约10s但并行请求可能更快）
+  const timeoutId = setTimeout(() => controller.abort(), 25000);
 
   try {
     const segments = splitText(clean, 150);
