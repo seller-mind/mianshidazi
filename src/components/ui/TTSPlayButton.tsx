@@ -29,26 +29,36 @@ export const TTSPlayButton = memo(function TTSPlayButton({
     lg: 'w-5 h-5',
   };
 
+  // 暗色主题样式:
+  // - 静止: bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300
+  // - loading: bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500
+  // - playing: bg-orange-100 dark:bg-orange-900/30 text-orange-500
+  // isLoading时不disabled，让用户可以取消请求
+
+  const isDisabled = disabled && !isLoading;
+
   return (
     <button
       onClick={onClick}
-      disabled={disabled || isLoading}
+      disabled={isDisabled}
       className={`
         ${sizeClasses[size]}
         flex items-center justify-center
         rounded-full
         transition-all duration-200
-        ${disabled || isLoading
-          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-          : isPlaying
-            ? 'bg-orange-100 text-orange-500 hover:bg-orange-200'
-            : 'bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-600'
+        ${isDisabled
+          ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+          : isLoading
+            ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600'
+            : isPlaying
+              ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-500 hover:bg-orange-200 dark:hover:bg-orange-800/40 cursor-pointer'
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer'
         }
       `}
-      title={isLoading ? '正在生成语音...' : isPlaying ? '停止播放' : '播放语音'}
+      title={isLoading ? '取消语音生成' : isPlaying ? '停止播放' : '播放语音'}
     >
       {isLoading ? (
-        // 加载动画
+        // 加载动画 - 点击可取消
         <svg
           className={`${iconSizes[size]} animate-spin`}
           fill="none"

@@ -1,7 +1,7 @@
 // TTS 语音播放 Hook
-// 核心方案：Audio元素直接指向 /api/tts 接口播放
-// 不用fetch！Audio元素自己处理加载、重定向、播放
-// 这和之前百度TTS能出声的方式完全一样
+// 核心方案：fetch + blob 方式
+// 原因：可以检查 response.ok 和 content-type，如果API返回错误可以立即知道
+// Audio(src) 方式如果服务端返回JSON错误，Audio不会报error，只会永远loading
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 
@@ -54,25 +54,40 @@ export function useTTS(options: UseTTSOptions = {}) {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const currentPlayingIdRef = useRef<string | null>(null);
-  // 预加载的Audio元素缓存
-  const preloadedAudios = useRef<Map<string, HTMLAudioElement>>(new Map());
+  const abortControllerRef = useRef<AbortController | null>(null);
+  // 预加载的 blob URL 缓存
+  const preloadedUrls = useRef<Map<string, string>>(new Map());
 
   // 清理
   useEffect(() => {
     return () => {
+      // 停止播放
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
       }
-      preloadedAudios.current.forEach(a => { a.pause(); a.src = ''; });
-      preloadedAudios.current.clear();
+      // 取消进行中的请求
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      // 清理预加载的 blob URL
+      preloadedUrls.current.forEach(url => URL.revokeObjectURL(url));
+      preloadedUrls.current.clear();
     };
   }, []);
 
   const stop = useCallback(() => {
+    // 停止当前播放
     if (audioRef.current) {
       audioRef.current.pause();
+      audioRef.current.src = '';
       audioRef.current = null;
+    }
+    // 取消进行中的请求
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
     }
     currentPlayingIdRef.current = null;
     setState({ isPlaying: false, playingId: null, isLoading: false, error: null });
@@ -88,57 +103,72 @@ export function useTTS(options: UseTTSOptions = {}) {
     return `/api/tts?${params.toString()}`;
   }, [persona, isCompanion]);
 
-  // 预加载：AI消息出现时创建Audio元素并预加载
-  const preload = useCallback((text: string, messageId: string) => {
-    if (preloadedAudios.current.has(messageId)) return;
+  // 预加载：fetch + blob 方式
+  const preload = useCallback(async (text: string, messageId: string) => {
+    if (preloadedUrls.current.has(messageId)) return;
 
     const clean = truncateText(cleanText(text), 300);
     if (!clean) return;
 
-    const audio = new Audio();
-    audio.preload = 'auto';
-    audio.src = buildTtsUrl(text);
-    preloadedAudios.current.set(messageId, audio);
+    const controller = new AbortController();
+
+    try {
+      const response = await fetch(buildTtsUrl(text), {
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        console.warn('TTS preload failed:', response.status);
+        return;
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        console.warn('TTS preload got JSON error');
+        return;
+      }
+
+      const blob = await response.blob();
+      if (blob.size > 0) {
+        const blobUrl = URL.createObjectURL(blob);
+        preloadedUrls.current.set(messageId, blobUrl);
+      }
+    } catch (err: unknown) {
+      const error = err as Error;
+      if (error.name !== 'AbortError') {
+        console.warn('TTS preload error:', error.message);
+      }
+    }
   }, [buildTtsUrl]);
 
   const isPreloaded = useCallback((messageId: string) => {
-    return preloadedAudios.current.has(messageId);
+    return preloadedUrls.current.has(messageId);
   }, []);
 
-  const isPreloading = useCallback((messageId: string) => {
-    return false;
-  }, []);
+  const isPreloading = useCallback(() => false, []);
 
-  // 播放音频 - 核心方法
-  const playAudio = useCallback((audio: HTMLAudioElement, messageId: string): Promise<void> => {
+  // 播放音频 - fetch + blob 方式
+  const playAudioFromUrl = useCallback(async (blobUrl: string, messageId: string): Promise<void> => {
     return new Promise((resolve, reject) => {
       // 停止当前播放
-      if (audioRef.current && audioRef.current !== audio) {
+      if (audioRef.current && audioRef.current !== blobUrl) {
         audioRef.current.pause();
+        audioRef.current.src = '';
       }
 
+      const audio = new Audio(blobUrl);
       audioRef.current = audio;
       currentPlayingIdRef.current = messageId;
 
       let settled = false;
 
-      const onCanPlay = () => {
-        if (settled) return;
-        setState({ isPlaying: true, playingId: messageId, isLoading: false, error: null });
-        audio.play().catch(e => {
-          if (!settled) { settled = true; cleanup(); reject(e); }
-        });
-      };
-
       const onEnded = () => {
         if (settled) return;
         settled = true;
         cleanup();
-        if (currentPlayingIdRef.current === messageId) {
-          audioRef.current = null;
-          currentPlayingIdRef.current = null;
-          setState({ isPlaying: false, playingId: null, isLoading: false, error: null });
-        }
+        audioRef.current = null;
+        currentPlayingIdRef.current = null;
+        setState({ isPlaying: false, playingId: null, isLoading: false, error: null });
         resolve();
       };
 
@@ -146,36 +176,27 @@ export function useTTS(options: UseTTSOptions = {}) {
         if (settled) return;
         settled = true;
         cleanup();
-        reject(new Error('音频加载失败'));
+        audioRef.current = null;
+        currentPlayingIdRef.current = null;
+        reject(new Error('音频播放失败'));
       };
 
       const cleanup = () => {
-        audio.removeEventListener('canplaythrough', onCanPlay);
         audio.removeEventListener('ended', onEnded);
         audio.removeEventListener('error', onError);
       };
 
-      audio.addEventListener('canplaythrough', onCanPlay, { once: true });
       audio.addEventListener('ended', onEnded);
-      audio.addEventListener('error', onError, { once: true });
+      audio.addEventListener('error', onError);
 
-      // 如果音频已经加载好了（预加载命中），直接播放
-      if (audio.readyState >= 3) { // HAVE_FUTURE_DATA
-        onCanPlay();
-        return;
-      }
-
-      // 开始加载
-      audio.load();
-
-      // 10秒超时
-      setTimeout(() => {
+      setState({ isPlaying: true, playingId: messageId, isLoading: false, error: null });
+      audio.play().catch(err => {
         if (!settled) {
           settled = true;
           cleanup();
-          reject(new Error('音频加载超时'));
+          reject(err);
         }
-      }, 10000);
+      });
     });
   }, []);
 
@@ -194,30 +215,65 @@ export function useTTS(options: UseTTSOptions = {}) {
 
     setState({ isPlaying: false, playingId: messageId, isLoading: true, error: null });
 
+    // 创建新的 AbortController
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
+      let blobUrl: string | null = null;
+
       // 1. 检查预加载缓存
-      const preloaded = preloadedAudios.current.get(messageId);
+      const preloaded = preloadedUrls.current.get(messageId);
       if (preloaded) {
-        await playAudio(preloaded, messageId);
+        blobUrl = preloaded;
+      } else {
+        // 2. 直接fetch获取blob
+        const response = await fetch(buildTtsUrl(text), {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`请求失败: ${response.status}`);
+        }
+
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || '语音合成失败');
+        }
+
+        const blob = await response.blob();
+        if (blob.size === 0) {
+          throw new Error('音频为空');
+        }
+
+        blobUrl = URL.createObjectURL(blob);
+        // 存入预加载缓存
+        preloadedUrls.current.set(messageId, blobUrl);
+      }
+
+      if (!blobUrl) {
+        throw new Error('无法获取音频');
+      }
+
+      await playAudioFromUrl(blobUrl, messageId);
+
+    } catch (err: unknown) {
+      const error = err as Error;
+      // AbortError 忽略
+      if (error.name === 'AbortError') {
         return;
       }
 
-      // 2. 创建新的Audio元素指向 /api/tts
-      const audio = new Audio();
-      audio.preload = 'auto';
-      audio.src = buildTtsUrl(text);
-      preloadedAudios.current.set(messageId, audio);
-
-      await playAudio(audio, messageId);
-    } catch (err) {
-      console.warn('TTS play failed:', err);
+      console.warn('TTS play failed:', error.message);
       if (currentPlayingIdRef.current === messageId) {
         audioRef.current = null;
         currentPlayingIdRef.current = null;
-        setState({ isPlaying: false, playingId: null, isLoading: false, error: '语音暂时不可用' });
+        abortControllerRef.current = null;
+        setState({ isPlaying: false, playingId: null, isLoading: false, error: error.message || '语音暂时不可用' });
       }
     }
-  }, [state.isPlaying, stop, playAudio, buildTtsUrl]);
+  }, [state.isPlaying, stop, buildTtsUrl, playAudioFromUrl]);
 
   const isPlayingMessage = useCallback((messageId: string) => {
     return state.playingId === messageId && state.isPlaying;
