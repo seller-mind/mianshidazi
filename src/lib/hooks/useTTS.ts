@@ -1,7 +1,6 @@
-// TTS 语音播放 Hook - 极简版
-// 核心：Audio.src = /api/tts?text=... 浏览器原生播放
-// 不用blob，不用下载，浏览器自己处理缓冲和播放
-// 预加载：创建Audio元素并preload
+// TTS 语音播放 Hook - URL版
+// 流程：fetch /api/tts 获取URL → Audio.src = OSS URL → 浏览器原生播放
+// 预加载：消息完成后立即请求URL并预缓冲，用户点击时秒播
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 
@@ -40,7 +39,7 @@ function cleanText(text: string): string {
     .trim();
 }
 
-function truncateText(text: string, maxLen = 150): string {
+function truncateText(text: string, maxLen = 200): string {
   if (text.length <= maxLen) return text;
   const truncated = text.substring(0, maxLen);
   const lastPunc = Math.max(
@@ -64,14 +63,13 @@ export function useTTS(options: UseTTSOptions = {}) {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playingIdRef = useRef<string | null>(null);
-  // 预加载的Audio元素
-  const preloadedAudios = useRef<Map<string, HTMLAudioElement>>(new Map());
+  // 缓存：messageId → { url, audio }
+  const cacheRef = useRef<Map<string, { url: string; audio: HTMLAudioElement }>>(new Map());
 
-  // 清理
   useEffect(() => {
     return () => {
       audioRef.current?.pause();
-      preloadedAudios.current.forEach(a => { a.pause(); a.src = ''; });
+      cacheRef.current.forEach(({ audio }) => { audio.pause(); audio.src = ''; });
     };
   }, []);
 
@@ -83,8 +81,8 @@ export function useTTS(options: UseTTSOptions = {}) {
   }, []);
 
   // 构建API URL
-  const buildUrl = useCallback((text: string): string => {
-    const clean = truncateText(cleanText(text), 150);
+  const buildApiUrl = useCallback((text: string): string => {
+    const clean = truncateText(cleanText(text), 200);
     const params = new URLSearchParams({
       text: clean,
       persona,
@@ -93,23 +91,32 @@ export function useTTS(options: UseTTSOptions = {}) {
     return `/api/tts?${params.toString()}`;
   }, [persona, isCompanion]);
 
-  // 预加载：创建Audio元素，让浏览器提前缓冲
-  // 用URL作为缓存key，内容变了会重新加载
+  // 预加载：请求API获取音频URL → 创建Audio预缓冲
   const preload = useCallback((text: string, messageId: string) => {
-    const url = buildUrl(text);
-    const existing = preloadedAudios.current.get(messageId);
-    // 如果已有且URL相同，不重复加载
-    if (existing && existing.dataset.url === url) return;
+    const apiUrl = buildApiUrl(text);
+    const existing = cacheRef.current.get(messageId);
 
-    const audio = new Audio();
-    audio.preload = 'auto';
-    audio.dataset.url = url;
-    audio.src = url;
-    preloadedAudios.current.set(messageId, audio);
-  }, [buildUrl]);
+    // URL未变，不需要重新加载
+    if (existing && existing.url === apiUrl) return;
+
+    // 请求API获取音频URL
+    fetch(apiUrl)
+      .then(res => res.json())
+      .then(data => {
+        if (!data.url) return;
+
+        const ossUrl = data.url;
+        // 创建Audio元素预缓冲
+        const audio = new Audio();
+        audio.preload = 'auto';
+        audio.src = ossUrl;
+        cacheRef.current.set(messageId, { url: apiUrl, audio });
+      })
+      .catch(() => { /* 预加载失败，不影响后续播放 */ });
+  }, [buildApiUrl]);
 
   const isPreloaded = useCallback((messageId: string) => {
-    return preloadedAudios.current.has(messageId);
+    return cacheRef.current.has(messageId);
   }, []);
 
   const isPreloading = useCallback(() => false, []);
@@ -127,40 +134,40 @@ export function useTTS(options: UseTTSOptions = {}) {
     setState({ isPlaying: false, playingId: messageId, isLoading: true, error: null });
     playingIdRef.current = messageId;
 
-    // 获取Audio元素（确保URL和当前文本一致）
-    const url = buildUrl(text);
-    let audio = preloadedAudios.current.get(messageId);
-    if (!audio || audio.dataset.url !== url) {
-      // 预加载的URL和当前文本不一致，重建Audio
-      audio = new Audio();
-      audio.preload = 'auto';
-      audio.dataset.url = url;
-      audio.src = url;
-      preloadedAudios.current.set(messageId, audio);
-    }
-
-    audioRef.current = audio;
-
-    // 设置MediaSession（防止系统杀掉音频）
-    if ('mediaSession' in navigator) {
-      try {
-        navigator.mediaSession.metadata = new MediaMetadata({
-          title: '面试搭子语音',
-          artist: '面试搭子',
-        });
-      } catch { /* ignore */ }
-    }
-
     try {
+      let audio: HTMLAudioElement;
+      const cached = cacheRef.current.get(messageId);
+
+      if (cached) {
+        audio = cached.audio;
+      } else {
+        // 没有缓存，实时请求
+        setState({ isPlaying: false, playingId: messageId, isLoading: true, error: null });
+
+        const apiUrl = buildApiUrl(text);
+        const res = await fetch(apiUrl);
+        const data = await res.json();
+
+        if (data.error) throw new Error(data.error);
+        if (!data.url) throw new Error('未获取到音频');
+
+        audio = new Audio();
+        audio.preload = 'auto';
+        audio.src = data.url;
+        cacheRef.current.set(messageId, { url: apiUrl, audio });
+      }
+
+      // 被取消了
+      if (playingIdRef.current !== messageId) return;
+
+      audioRef.current = audio;
+
       await new Promise<void>((resolve, reject) => {
         let settled = false;
 
-        const onCanPlay = () => {
+        const onPlaying = () => {
           if (settled) return;
           setState({ isPlaying: true, playingId: messageId, isLoading: false, error: null });
-          audio!.play().catch(err => {
-            if (!settled) { settled = true; cleanup(); reject(err); }
-          });
         };
 
         const onEnded = () => {
@@ -177,31 +184,27 @@ export function useTTS(options: UseTTSOptions = {}) {
           if (settled) return;
           settled = true;
           cleanup();
-          const errMsg = audio!.error?.message || '播放失败';
-          reject(new Error(errMsg));
+          reject(new Error('播放失败'));
         };
 
         const cleanup = () => {
-          audio!.removeEventListener('canplay', onCanPlay);
-          audio!.removeEventListener('canplaythrough', onCanPlay);
-          audio!.removeEventListener('ended', onEnded);
-          audio!.removeEventListener('error', onError);
+          audio.removeEventListener('playing', onPlaying);
+          audio.removeEventListener('ended', onEnded);
+          audio.removeEventListener('error', onError);
         };
 
-        audio!.addEventListener('canplay', onCanPlay, { once: true });
-        audio!.addEventListener('canplaythrough', onCanPlay, { once: true });
-        audio!.addEventListener('ended', onEnded);
-        audio!.addEventListener('error', onError, { once: true });
+        audio.addEventListener('playing', onPlaying, { once: true });
+        audio.addEventListener('ended', onEnded);
+        audio.addEventListener('error', onError, { once: true });
 
-        // 如果已经有足够数据，直接播放
-        if (audio!.readyState >= 3) {
-          onCanPlay();
-          return;
-        }
-
-        // 如果还没开始加载，触发加载
-        if (audio!.readyState === 0) {
-          audio!.load();
+        // 如果已经在播放或暂停中（预加载好的）
+        if (!audio.paused && !audio.ended) {
+          // 正在播放，直接标记
+          setState({ isPlaying: true, playingId: messageId, isLoading: false, error: null });
+        } else {
+          // 从头播放
+          audio.currentTime = 0;
+          audio.play().catch(reject);
         }
 
         // 超时
@@ -213,6 +216,7 @@ export function useTTS(options: UseTTSOptions = {}) {
           }
         }, 20000);
       });
+
     } catch (err: unknown) {
       const error = err as Error;
       if (playingIdRef.current === messageId) {
@@ -221,7 +225,7 @@ export function useTTS(options: UseTTSOptions = {}) {
         setState({ isPlaying: false, playingId: null, isLoading: false, error: error.message });
       }
     }
-  }, [state.isPlaying, stop, buildUrl]);
+  }, [state.isPlaying, stop, buildApiUrl]);
 
   const isPlayingMessage = useCallback((messageId: string) => {
     return state.playingId === messageId && state.isPlaying;

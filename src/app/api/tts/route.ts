@@ -1,6 +1,6 @@
 // TTS API - 阿里云百炼 CosyVoice
-// 流式返回音频：调用CosyVoice获取URL → 从OSS流式下载并直接转发给客户端
-// 客户端Audio元素直接播放API URL，浏览器原生处理缓冲和播放
+// 只返回音频URL，不下载音频（省3-5秒，避免Vercel超时）
+// 客户端Audio直接播放OSS URL
 
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -18,13 +18,13 @@ const COMPANION_VOICE = 'longxiaochun_v3';
 
 function cleanText(text: string): string {
   return text
-    .replace(/[（(][^）)]*[）)]/g, '')  // 去括号舞台指示
-    .replace(/[\u{1F600}-\u{1F64F}]/gu, '') // emoji
+    .replace(/[（(][^）)]*[）)]/g, '')
+    .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
     .replace(/[\u{1F300}-\u{1F5FF}]/gu, '')
     .replace(/[\u{1F680}-\u{1F6FF}]/gu, '')
     .replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '')
     .replace(/[\u{2702}-\u{27B0}]/gu, '')
-    .replace(/\*{1,2}([^*]+)\*{1,2}/g, '$1') // 去Markdown加粗/斜体
+    .replace(/\*{1,2}([^*]+)\*{1,2}/g, '$1')
     .replace(/#{1,6}\s/g, '')
     .replace(/[「」『』]/g, '')
     .replace(/[～~]/g, '，')
@@ -39,7 +39,7 @@ function cleanText(text: string): string {
     .trim();
 }
 
-function truncateText(text: string, maxLen = 150): string {
+function truncateText(text: string, maxLen = 200): string {
   if (text.length <= maxLen) return text;
   const truncated = text.substring(0, maxLen);
   const lastPunc = Math.max(
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
   const persona = searchParams.get('persona') || 'A';
   const isCompanion = searchParams.get('isCompanion') === 'true';
 
-  const text = truncateText(cleanText(rawText), 150);
+  const text = truncateText(cleanText(rawText), 200);
   if (!text) {
     return NextResponse.json({ error: '没有可朗读的内容' }, { status: 400 });
   }
@@ -72,8 +72,7 @@ export async function GET(request: NextRequest) {
   const timeoutId = setTimeout(() => controller.abort(), 9000);
 
   try {
-    // 第一步：调用CosyVoice获取音频URL
-    const cosResponse = await fetch(TTS_URL, {
+    const response = await fetch(TTS_URL, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${DASHSCOPE_API_KEY}`,
@@ -86,36 +85,21 @@ export async function GET(request: NextRequest) {
       signal: controller.signal,
     });
 
-    if (!cosResponse.ok) {
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
       return NextResponse.json({ error: '语音合成失败' }, { status: 500 });
     }
 
-    const cosData = await cosResponse.json();
-    const audioUrl = cosData?.output?.audio?.url;
+    const data = await response.json();
+    const audioUrl = data?.output?.audio?.url;
 
     if (!audioUrl) {
       return NextResponse.json({ error: '语音合成异常' }, { status: 500 });
     }
 
-    // 第二步：流式转发OSS音频（不缓存到内存，直接pipe）
-    const httpsUrl = audioUrl.replace(/^http:/, 'https:');
-    const audioResponse = await fetch(httpsUrl, { signal: controller.signal });
-
-    if (!audioResponse.ok) {
-      return NextResponse.json({ error: '音频下载失败' }, { status: 500 });
-    }
-
-    clearTimeout(timeoutId);
-
-    // 直接流式返回，浏览器边下载边播放
-    const headers = new Headers();
-    headers.set('Content-Type', 'audio/mpeg');
-    headers.set('Cache-Control', 'public, max-age=86400');
-    const contentLength = audioResponse.headers.get('Content-Length');
-    if (contentLength) headers.set('Content-Length', contentLength);
-    headers.set('Accept-Ranges', 'bytes');
-
-    return new Response(audioResponse.body, { headers });
+    // 只返回URL，不下载音频（省3-5秒，避免超时）
+    return NextResponse.json({ url: audioUrl.replace(/^http:/, 'https:') });
 
   } catch (err: unknown) {
     clearTimeout(timeoutId);
