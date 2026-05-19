@@ -30,7 +30,19 @@ function cleanText(text: string): string {
     .replace(/\*\*/g, '')
     .replace(/#{1,6}\s/g, '')
     .replace(/[「」『』]/g, '')
+    // 去掉括号里的舞台指示（停顿2秒）（轻轻微笑）等
+    .replace(/[（(][^）)]*[）)]/g, '')
+    // 波浪号→逗号
+    .replace(/[～~]/g, '，')
+    // 语气词替换
+    .replace(/哎哟[，,！!。]/g, '嗯，')
+    .replace(/哎呦[，,！!。]/g, '嗯，')
+    .replace(/哟[，,！!。]/g, '，')
+    .replace(/嗯嗯+/g, '嗯')
+    .replace(/哈哈+/g, '哈哈')
     .replace(/\n+/g, '。')
+    .replace(/。{2,}/g, '。')
+    .replace(/，{2,}/g, '，')
     .trim();
 }
 

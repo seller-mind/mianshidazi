@@ -27,7 +27,17 @@ function cleanText(text: string): string {
     .replace(/\*\*/g, '')
     .replace(/#{1,6}\s/g, '')
     .replace(/[「」『』]/g, '')
+    // 去掉括号里的舞台指示
+    .replace(/[（(][^）)]*[）)]/g, '')
+    .replace(/[～~]/g, '，')
+    .replace(/哎哟[，,！!。]/g, '嗯，')
+    .replace(/哎呦[，,！!。]/g, '嗯，')
+    .replace(/哟[，,！!。]/g, '，')
+    .replace(/嗯嗯+/g, '嗯')
+    .replace(/哈哈+/g, '哈哈')
     .replace(/\n+/g, '。')
+    .replace(/。{2,}/g, '。')
+    .replace(/，{2,}/g, '，')
     .trim();
 }
 
@@ -111,6 +121,13 @@ export function useTTS(options: UseTTSOptions = {}) {
       const data = await response.json();
       if (data.url || data.urls) {
         preloadedCache.current.set(messageId, data);
+        // 预加载第一段音频文件到浏览器缓存
+        const firstUrl = data.url || (data.urls && data.urls[0]);
+        if (firstUrl) {
+          const audio = new Audio(firstUrl);
+          audio.preload = 'auto';
+          audio.load();
+        }
       }
     } catch (err: unknown) {
       const error = err as Error;
@@ -182,11 +199,18 @@ export function useTTS(options: UseTTSOptions = {}) {
     });
   }, []);
 
-  // 播放多个音频URL（按顺序）
+  // 播放多个音频URL（按顺序，预加载下一段）
   const playMultipleAudio = useCallback(async (urls: string[], messageId: string): Promise<void> => {
     for (let i = 0; i < urls.length; i++) {
       // 如果已被取消，停止播放
       if (currentPlayingIdRef.current !== messageId) return;
+
+      // 预加载下一段音频（浏览器缓存）
+      if (i + 1 < urls.length) {
+        const nextAudio = new Audio(urls[i + 1]);
+        nextAudio.preload = 'auto';
+        nextAudio.load();
+      }
 
       setState({ isPlaying: true, playingId: messageId, isLoading: false, error: null });
       await playSingleAudio(urls[i]);
