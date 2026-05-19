@@ -8,6 +8,7 @@ interface TTSPlayButtonProps {
   onClick: () => void;
   disabled?: boolean;
   size?: 'sm' | 'md' | 'lg';
+  variant?: 'light' | 'dark';
 }
 
 export const TTSPlayButton = memo(function TTSPlayButton({
@@ -16,6 +17,7 @@ export const TTSPlayButton = memo(function TTSPlayButton({
   onClick,
   disabled = false,
   size = 'sm',
+  variant = 'light',
 }: TTSPlayButtonProps) {
   const sizeClasses = {
     sm: 'w-6 h-6',
@@ -29,13 +31,32 @@ export const TTSPlayButton = memo(function TTSPlayButton({
     lg: 'w-5 h-5',
   };
 
-  // 暗色主题样式:
-  // - 静止: bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300
-  // - loading: bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500
-  // - playing: bg-orange-100 dark:bg-orange-900/30 text-orange-500
   // isLoading时不disabled，让用户可以取消请求
 
   const isDisabled = disabled && !isLoading;
+
+  // 根据variant返回对应状态的样式类
+  const getStateClasses = () => {
+    if (isDisabled) {
+      return variant === 'dark'
+        ? 'bg-white/10 text-white/40 cursor-not-allowed'
+        : 'bg-gray-100 text-gray-400 cursor-not-allowed';
+    }
+    if (isLoading) {
+      return variant === 'dark'
+        ? 'bg-white/20 text-white/70 cursor-pointer hover:bg-white/30'
+        : 'bg-gray-100 text-gray-400 cursor-pointer hover:bg-gray-200';
+    }
+    if (isPlaying) {
+      return variant === 'dark'
+        ? 'bg-orange-500/30 text-orange-400 hover:bg-orange-500/40 cursor-pointer'
+        : 'bg-orange-100 text-orange-500 hover:bg-orange-200 cursor-pointer';
+    }
+    // 静止状态
+    return variant === 'dark'
+      ? 'bg-white/20 text-white cursor-pointer hover:bg-white/30 hover:text-white/90'
+      : 'bg-gray-100 text-gray-500 cursor-pointer hover:bg-gray-200 hover:text-gray-600';
+  };
 
   return (
     <button
@@ -46,14 +67,7 @@ export const TTSPlayButton = memo(function TTSPlayButton({
         flex items-center justify-center
         rounded-full
         transition-all duration-200
-        ${isDisabled
-          ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
-          : isLoading
-            ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600'
-            : isPlaying
-              ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-500 hover:bg-orange-200 dark:hover:bg-orange-800/40 cursor-pointer'
-              : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer'
-        }
+        ${getStateClasses()}
       `}
       title={isLoading ? '取消语音生成' : isPlaying ? '停止播放' : '播放语音'}
     >

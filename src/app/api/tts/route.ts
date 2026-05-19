@@ -15,14 +15,14 @@ const TTS_URL = 'https://dashscope.aliyuncs.com/api/v1/services/audio/tts/Speech
 // E(HR老油条): 呆板大暖男
 // Companion: 知性积极女-语音助手音色
 const PERSONA_VOICE: Record<string, { voice: string; rate: number }> = {
-  A: { voice: 'longanwen_v3', rate: 0.9 },
+  A: { voice: 'longanwen_v3', rate: 1.0 },
   B: { voice: 'longanlang_v3', rate: 1.0 },
-  C: { voice: 'longcheng_v3', rate: 1.1 },
-  D: { voice: 'longyingmu_v3', rate: 1.05 },
-  E: { voice: 'longzhe_v3', rate: 0.9 },
+  C: { voice: 'longcheng_v3', rate: 1.0 },
+  D: { voice: 'longyingmu_v3', rate: 1.0 },
+  E: { voice: 'longzhe_v3', rate: 1.0 },
 };
 
-const COMPANION_VOICE = { voice: 'longxiaochun_v3', rate: 0.85 };
+const COMPANION_VOICE = { voice: 'longxiaochun_v3', rate: 1.0 };
 
 function cleanText(text: string): string {
   return text
@@ -34,11 +34,11 @@ function cleanText(text: string): string {
     .replace(/\*\*/g, '')
     .replace(/#{1,6}\s/g, '')
     .replace(/[「」『』]/g, '')
-    .replace(/\n+/g, '，')
+    .replace(/\n+/g, '。')
     .trim();
 }
 
-function truncateText(text: string, maxLen = 300): string {
+function truncateText(text: string, maxLen = 800): string {
   if (text.length <= maxLen) return text;
   const truncated = text.substring(0, maxLen);
   const lastPunc = Math.max(
@@ -55,7 +55,7 @@ async function synthesize(text: string, persona?: string, isCompanion?: boolean)
     return NextResponse.json({ error: 'TTS API Key 未配置' }, { status: 500 });
   }
 
-  const clean = truncateText(cleanText(text), 300);
+  const clean = truncateText(cleanText(text), 800);
   if (!clean) {
     return NextResponse.json({ error: '没有可朗读的内容' }, { status: 400 });
   }

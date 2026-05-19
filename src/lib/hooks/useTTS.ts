@@ -27,11 +27,11 @@ function cleanText(text: string): string {
     .replace(/\*\*/g, '')
     .replace(/#{1,6}\s/g, '')
     .replace(/[「」『』]/g, '')
-    .replace(/\n+/g, '，')
+    .replace(/\n+/g, '。')
     .trim();
 }
 
-function truncateText(text: string, maxLen = 300): string {
+function truncateText(text: string, maxLen = 800): string {
   if (text.length <= maxLen) return text;
   const truncated = text.substring(0, maxLen);
   const lastPunc = Math.max(
@@ -96,7 +96,7 @@ export function useTTS(options: UseTTSOptions = {}) {
   // 构建 /api/tts 的URL
   const buildTtsUrl = useCallback((text: string): string => {
     const params = new URLSearchParams({
-      text: truncateText(cleanText(text), 300),
+      text: truncateText(cleanText(text), 800),
       persona,
       isCompanion: String(isCompanion),
     });
@@ -107,7 +107,7 @@ export function useTTS(options: UseTTSOptions = {}) {
   const preload = useCallback(async (text: string, messageId: string) => {
     if (preloadedUrls.current.has(messageId)) return;
 
-    const clean = truncateText(cleanText(text), 300);
+    const clean = truncateText(cleanText(text), 800);
     if (!clean) return;
 
     const controller = new AbortController();

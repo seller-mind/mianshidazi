@@ -262,6 +262,7 @@ export default function CompanionPage() {
                   onClick={() => play(msg.content, msg.id)}
                   disabled={!msg.content.trim()}
                   size="sm"
+                  variant="dark"
                 />
               )}
               <div
