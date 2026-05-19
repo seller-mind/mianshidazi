@@ -24,12 +24,17 @@ export default function CompanionPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // TTS 语音播放 - 阿搭陪伴使用专属音色
-  const { play, isPlayingMessage, isLoadingMessage } = useTTS({ isCompanion: true });
+  const { play, preload, isPlayingMessage, isLoadingMessage } = useTTS({ isCompanion: true });
 
-  // 滚动到底部
+  // 滚动到底部 + 预加载新消息语音
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    messages.forEach(msg => {
+      if (msg.role === 'assistant' && msg.content) {
+        preload(msg.content, msg.id);
+      }
+    });
+  }, [messages, preload]);
 
   // 初始化欢迎消息
   useEffect(() => {

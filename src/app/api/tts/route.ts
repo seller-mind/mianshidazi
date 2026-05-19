@@ -1,29 +1,22 @@
-// TTS 语音合成 API
-// 使用阿里云百炼 CosyVoice（高质量神经网络语音）
-// GET: 文本通过查询参数传入，返回音频
-// POST: JSON body，返回音频
+// TTS API - 阿里云百炼 CosyVoice
+// 使用 SSE 流式合成，服务端收集完音频后返回 MP3
+// 客户端可配合预加载实现秒出声
 
 import { NextRequest, NextResponse } from 'next/server';
 
 const DASHSCOPE_API_KEY = process.env.DASHSCOPE_API_KEY;
 const TTS_URL = 'https://dashscope.aliyuncs.com/api/v1/services/audio/tts/SpeechSynthesizer';
 
-// 人格音色映射（cosyvoice-v3-flash 音色）
-const PERSONA_VOICE: Record<string, { voice: string; rate: number; instruction?: string }> = {
-  // 温柔鼓励型 - 龙颜 温暖春风女
-  A: { voice: 'longyan_v3', rate: 0.9, instruction: '你说话的情感是happy。' },
-  // 真实模拟型 - 龙橙 智慧青年男
-  B: { voice: 'longcheng_v3', rate: 1.0 },
-  // 压力挑战型 - 龙小诚 磁性低音男
-  C: { voice: 'longxiaocheng_v2', rate: 1.1 },
-  // 犀利毒舌型 - 龙婉 积极知性女
-  D: { voice: 'longwan_v2', rate: 1.05 },
-  // HR老油条型 - 龙泽 温暖元气男
-  E: { voice: 'longze_v2', rate: 0.9 },
+// 人格 → 音色映射（均为 cosyvoice-v3-flash 兼容音色）
+const PERSONA_VOICE: Record<string, { voice: string; rate: number }> = {
+  A: { voice: 'longanwen_v3', rate: 0.85 },   // 优雅知性女 - 温柔鼓励
+  B: { voice: 'longanlang_v3', rate: 1.0 },    // 清爽利落男 - 真实模拟
+  C: { voice: 'longcheng_v3', rate: 1.1 },     // 智慧青年男 - 压力挑战
+  D: { voice: 'longyingmu_v3', rate: 1.05 },   // 优雅知性女 - 犀利毒舌
+  E: { voice: 'longzhe_v3', rate: 0.9 },       // 大暖男 - HR老油条
 };
 
-// 陪伴模式 - 龙安柔 温柔闺蜜女
-const COMPANION_VOICE = { voice: 'longanrou', rate: 0.9, instruction: '你正在进行闲聊对话，你说话的情感是happy。' };
+const COMPANION_VOICE = { voice: 'longanrou', rate: 0.85 }; // 温柔闺蜜女
 
 function cleanText(text: string): string {
   return text
@@ -43,16 +36,15 @@ function truncateText(text: string, maxLen = 300): string {
   if (text.length <= maxLen) return text;
   const truncated = text.substring(0, maxLen);
   const lastPunc = Math.max(
-    truncated.lastIndexOf('。'),
-    truncated.lastIndexOf('，'),
-    truncated.lastIndexOf('！'),
-    truncated.lastIndexOf('？')
+    truncated.lastIndexOf('。'), truncated.lastIndexOf('，'),
+    truncated.lastIndexOf('！'), truncated.lastIndexOf('？')
   );
   if (lastPunc > maxLen * 0.5) return text.substring(0, lastPunc + 1);
   return truncated + '…';
 }
 
-async function synthesize(text: string, persona?: string, isCompanion?: boolean) {
+// 流式合成：用 SSE 从 CosyVoice 获取音频，服务端收集后返回完整 MP3
+async function synthesizeStream(text: string, persona?: string, isCompanion?: boolean) {
   if (!DASHSCOPE_API_KEY) {
     return NextResponse.json({ error: 'TTS API Key 未配置' }, { status: 500 });
   }
@@ -64,7 +56,7 @@ async function synthesize(text: string, persona?: string, isCompanion?: boolean)
 
   const voiceConfig = isCompanion ? COMPANION_VOICE : (PERSONA_VOICE[persona || 'A'] || PERSONA_VOICE['A']);
 
-  const body: Record<string, unknown> = {
+  const body = {
     model: 'cosyvoice-v3-flash',
     input: {
       text: clean,
@@ -75,14 +67,91 @@ async function synthesize(text: string, persona?: string, isCompanion?: boolean)
     },
   };
 
-  // 添加 Instruct 指令（如果音色支持）
-  if (voiceConfig.instruction) {
-    body.input = {
-      ...body.input as object,
-      instruction: voiceConfig.instruction,
-    };
-  }
+  try {
+    // 使用 SSE 流式请求（首包更快）
+    const response = await fetch(TTS_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${DASHSCOPE_API_KEY}`,
+        'Content-Type': 'application/json',
+        'X-DashScope-SSE': 'enable',
+      },
+      body: JSON.stringify(body),
+    });
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('CosyVoice error:', response.status, errorText.substring(0, 200));
+
+      // SSE 流式失败，尝试非流式
+      return await synthesizeNonStream(body);
+    }
+
+    // 解析 SSE，收集 base64 音频块
+    const audioChunks: Buffer[] = [];
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.startsWith('data:')) {
+          try {
+            const data = JSON.parse(line.slice(5).trim());
+            const audioData = data.output?.audio?.data;
+            if (audioData) {
+              audioChunks.push(Buffer.from(audioData, 'base64'));
+            }
+            // 检查是否有音频 URL（非流式返回格式）
+            const audioUrl = data.output?.audio?.url;
+            if (audioUrl && !audioData) {
+              const audioResp = await fetch(audioUrl);
+              const audioBuf = Buffer.from(await audioResp.arrayBuffer());
+              return new NextResponse(audioBuf, {
+                status: 200,
+                headers: {
+                  'Content-Type': 'audio/mpeg',
+                  'Content-Length': audioBuf.byteLength.toString(),
+                  'Cache-Control': 'public, max-age=86400',
+                },
+              });
+            }
+          } catch {
+            // 忽略解析错误
+          }
+        }
+      }
+    }
+
+    if (audioChunks.length === 0) {
+      // SSE 没收集到音频，尝试非流式
+      return await synthesizeNonStream(body);
+    }
+
+    const combined = Buffer.concat(audioChunks);
+    return new NextResponse(combined, {
+      status: 200,
+      headers: {
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': combined.byteLength.toString(),
+        'Cache-Control': 'public, max-age=86400',
+      },
+    });
+  } catch (error) {
+    console.error('CosyVoice stream error:', error);
+    return NextResponse.json({ error: '语音合成失败' }, { status: 500 });
+  }
+}
+
+// 非流式合成（兜底）
+async function synthesizeNonStream(body: Record<string, unknown>) {
   try {
     const response = await fetch(TTS_URL, {
       method: 'POST',
@@ -94,16 +163,12 @@ async function synthesize(text: string, persona?: string, isCompanion?: boolean)
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('CosyVoice API error:', response.status, errorText);
       return NextResponse.json({ error: '语音合成失败' }, { status: 500 });
     }
 
-    // 检查返回类型 - CosyVoice 可能返回 JSON 或音频流
     const contentType = response.headers.get('content-type') || '';
 
     if (contentType.includes('audio') || contentType.includes('octet-stream')) {
-      // 直接返回音频
       const audioBuffer = await response.arrayBuffer();
       return new NextResponse(audioBuffer, {
         status: 200,
@@ -115,44 +180,42 @@ async function synthesize(text: string, persona?: string, isCompanion?: boolean)
       });
     }
 
-    // 如果返回 JSON，提取音频 URL 或 base64
     const data = await response.json();
-    if (data.output?.audio) {
-      // base64 编码的音频
-      const audioBuffer = Buffer.from(data.output.audio, 'base64');
-      return new NextResponse(audioBuffer, {
+    const audioUrl = data.output?.audio?.url;
+    const audioData = data.output?.audio?.data;
+
+    if (audioUrl) {
+      const audioResp = await fetch(audioUrl);
+      const audioBuf = Buffer.from(await audioResp.arrayBuffer());
+      return new NextResponse(audioBuf, {
         status: 200,
         headers: {
           'Content-Type': 'audio/mpeg',
-          'Content-Length': audioBuffer.byteLength.toString(),
+          'Content-Length': audioBuf.byteLength.toString(),
           'Cache-Control': 'public, max-age=86400',
         },
       });
     }
 
-    if (data.output?.audio_url) {
-      // 返回音频 URL，需要代理下载
-      const audioResp = await fetch(data.output.audio_url);
-      const audioBuffer = await audioResp.arrayBuffer();
-      return new NextResponse(audioBuffer, {
+    if (audioData) {
+      const audioBuf = Buffer.from(audioData, 'base64');
+      return new NextResponse(audioBuf, {
         status: 200,
         headers: {
           'Content-Type': 'audio/mpeg',
-          'Content-Length': audioBuffer.byteLength.toString(),
+          'Content-Length': audioBuf.byteLength.toString(),
           'Cache-Control': 'public, max-age=86400',
         },
       });
     }
 
-    console.error('Unexpected CosyVoice response:', JSON.stringify(data).substring(0, 500));
     return NextResponse.json({ error: '语音合成返回格式异常' }, { status: 500 });
   } catch (error) {
-    console.error('CosyVoice API error:', error);
-    return NextResponse.json({ error: '语音合成服务异常' }, { status: 500 });
+    console.error('CosyVoice non-stream error:', error);
+    return NextResponse.json({ error: '语音合成失败' }, { status: 500 });
   }
 }
 
-// GET - 文本通过查询参数传入
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -160,28 +223,20 @@ export async function GET(request: NextRequest) {
     const persona = searchParams.get('persona') || undefined;
     const isCompanion = searchParams.get('isCompanion') === 'true';
 
-    if (!text) {
-      return NextResponse.json({ error: '缺少 text 参数' }, { status: 400 });
-    }
-
-    return await synthesize(text, persona, isCompanion);
+    if (!text) return NextResponse.json({ error: '缺少 text 参数' }, { status: 400 });
+    return await synthesizeStream(text, persona, isCompanion);
   } catch (error) {
     console.error('TTS GET error:', error);
     return NextResponse.json({ error: '语音合成失败' }, { status: 500 });
   }
 }
 
-// POST - JSON body
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { text, persona, isCompanion } = body;
-
-    if (!text) {
-      return NextResponse.json({ error: '缺少必要参数: text' }, { status: 400 });
-    }
-
-    return await synthesize(text, persona, isCompanion);
+    if (!text) return NextResponse.json({ error: '缺少 text 参数' }, { status: 400 });
+    return await synthesizeStream(text, persona, isCompanion);
   } catch (error) {
     console.error('TTS POST error:', error);
     return NextResponse.json({ error: '语音合成失败' }, { status: 500 });

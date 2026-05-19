@@ -1,7 +1,7 @@
-// TTS 语音播放 Hook
-// 方案1: 服务端 CosyVoice（阿里云百炼，高质量神经网络语音）
-// 方案2: 百度翻译 TTS 兜底（机械感但稳定）
-// 播放方式：<audio> 元素（最兼容 WebView）
+// TTS 语音播放 Hook - 带预加载
+// AI消息一出现就在后台生成音频，用户点喇叭时秒出声
+// 方案1: 服务端 CosyVoice（阿里云百炼，神经网络语音）
+// 方案2: 百度翻译 TTS 兜底
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 
@@ -17,7 +17,6 @@ export interface UseTTSOptions {
   isCompanion?: boolean;
 }
 
-// 清理文本
 function cleanText(text: string): string {
   return text
     .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
@@ -32,34 +31,15 @@ function cleanText(text: string): string {
     .trim();
 }
 
-// 截断文本
 function truncateText(text: string, maxLen = 300): string {
   if (text.length <= maxLen) return text;
   const truncated = text.substring(0, maxLen);
   const lastPunc = Math.max(
-    truncated.lastIndexOf('。'),
-    truncated.lastIndexOf('，'),
-    truncated.lastIndexOf('！'),
-    truncated.lastIndexOf('？')
+    truncated.lastIndexOf('。'), truncated.lastIndexOf('，'),
+    truncated.lastIndexOf('！'), truncated.lastIndexOf('？')
   );
   if (lastPunc > maxLen * 0.5) return text.substring(0, lastPunc + 1);
   return truncated + '…';
-}
-
-// 构建服务端 TTS URL
-function buildServerTTSUrl(text: string, persona: string, isCompanion: boolean): string {
-  const params = new URLSearchParams({
-    text: truncateText(cleanText(text), 300),
-    persona,
-    isCompanion: String(isCompanion),
-  });
-  return `/api/tts?${params.toString()}`;
-}
-
-// 百度 TTS URL（兜底）
-function buildBaiduTTSUrl(text: string, speed: number = 5): string {
-  const clean = truncateText(cleanText(text), 200);
-  return `https://fanyi.baidu.com/gettts?lan=zh&text=${encodeURIComponent(clean)}&spd=${speed}&source=web`;
 }
 
 export function useTTS(options: UseTTSOptions = {}) {
@@ -72,15 +52,22 @@ export function useTTS(options: UseTTSOptions = {}) {
     error: null,
   });
 
+  // 音频缓存: messageId → blobUrl
+  const audioCache = useRef<Map<string, string>>(new Map());
+  // 正在预加载的 messageId 集合
+  const preloadingSet = useRef<Set<string>>(new Set());
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const currentPlayingIdRef = useRef<string | null>(null);
 
+  // 清理
   useEffect(() => {
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
       }
+      audioCache.current.forEach(url => URL.revokeObjectURL(url));
+      audioCache.current.clear();
     };
   }, []);
 
@@ -100,26 +87,65 @@ export function useTTS(options: UseTTSOptions = {}) {
     });
   }, []);
 
-  // 播放 URL 音频
-  const playAudioUrl = useCallback((audioUrl: string, messageId: string, timeoutMs = 10000): Promise<void> => {
+  // 预加载：AI消息一出现就后台生成音频
+  const preload = useCallback((text: string, messageId: string) => {
+    // 已缓存或正在加载，跳过
+    if (audioCache.current.has(messageId) || preloadingSet.current.has(messageId)) return;
+
+    const clean = truncateText(cleanText(text), 300);
+    if (!clean) return;
+
+    preloadingSet.current.add(messageId);
+
+    const params = new URLSearchParams({
+      text: clean,
+      persona,
+      isCompanion: String(isCompanion),
+    });
+
+    fetch(`/api/tts?${params.toString()}`)
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.blob();
+      })
+      .then(blob => {
+        const blobUrl = URL.createObjectURL(blob);
+        audioCache.current.set(messageId, blobUrl);
+      })
+      .catch(err => {
+        console.warn('TTS preload failed:', err);
+      })
+      .finally(() => {
+        preloadingSet.current.delete(messageId);
+      });
+  }, [persona, isCompanion]);
+
+  // 检查是否已预加载完成
+  const isPreloaded = useCallback((messageId: string) => {
+    return audioCache.current.has(messageId);
+  }, []);
+
+  // 检查是否正在预加载
+  const isPreloading = useCallback((messageId: string) => {
+    return preloadingSet.current.has(messageId);
+  }, []);
+
+  // 播放音频
+  const playAudioUrl = useCallback((audioUrl: string, messageId: string, timeoutMs = 12000): Promise<void> => {
     return new Promise((resolve, reject) => {
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
       }
 
-      const audio = new Audio();
+      const audio = new Audio(audioUrl);
       audio.preload = 'auto';
       audioRef.current = audio;
       currentPlayingIdRef.current = messageId;
 
       let settled = false;
       const timer = setTimeout(() => {
-        if (!settled) {
-          settled = true;
-          cleanup();
-          reject(new Error('音频加载超时'));
-        }
+        if (!settled) { settled = true; cleanup(); reject(new Error('超时')); }
       }, timeoutMs);
 
       const cleanup = () => {
@@ -130,55 +156,34 @@ export function useTTS(options: UseTTSOptions = {}) {
       };
 
       const onCanPlay = () => {
-        setState({
-          isPlaying: true,
-          playingId: messageId,
-          isLoading: false,
-          error: null,
-        });
-        audio.play().catch((e) => {
-          if (!settled) {
-            settled = true;
-            cleanup();
-            reject(e);
-          }
-        });
+        setState({ isPlaying: true, playingId: messageId, isLoading: false, error: null });
+        audio.play().catch(e => { if (!settled) { settled = true; cleanup(); reject(e); } });
       };
 
       const onEnded = () => {
         if (!settled) {
-          settled = true;
-          cleanup();
+          settled = true; cleanup();
           if (currentPlayingIdRef.current === messageId) {
             audioRef.current = null;
             currentPlayingIdRef.current = null;
-            setState({
-              isPlaying: false,
-              playingId: null,
-              isLoading: false,
-              error: null,
-            });
+            setState({ isPlaying: false, playingId: null, isLoading: false, error: null });
           }
           resolve();
         }
       };
 
       const onError = () => {
-        if (!settled) {
-          settled = true;
-          cleanup();
-          reject(new Error('音频加载失败'));
-        }
+        if (!settled) { settled = true; cleanup(); reject(new Error('播放失败')); }
       };
 
       audio.addEventListener('canplay', onCanPlay, { once: true });
       audio.addEventListener('ended', onEnded);
       audio.addEventListener('error', onError, { once: true });
-
       audio.src = audioUrl;
     });
   }, []);
 
+  // 主播放入口
   const play = useCallback(async (text: string, messageId: string) => {
     // 点击同一条：停止
     if (currentPlayingIdRef.current === messageId && state.isPlaying) {
@@ -191,44 +196,49 @@ export function useTTS(options: UseTTSOptions = {}) {
     const clean = cleanText(text);
     if (!clean) return;
 
-    setState({
-      isPlaying: false,
-      playingId: messageId,
-      isLoading: true,
-      error: null,
-    });
+    // 检查缓存 → 秒出声！
+    const cachedUrl = audioCache.current.get(messageId);
+    if (cachedUrl) {
+      setState({ isPlaying: false, playingId: messageId, isLoading: true, error: null });
+      try {
+        await playAudioUrl(cachedUrl, messageId, 3000);
+        return;
+      } catch {
+        // 缓存的 blob 可能失效，清除后重新加载
+        URL.revokeObjectURL(cachedUrl);
+        audioCache.current.delete(messageId);
+      }
+    }
+
+    setState({ isPlaying: false, playingId: messageId, isLoading: true, error: null });
 
     try {
-      // 方案1: 服务端 CosyVoice（高质量）
-      const serverUrl = buildServerTTSUrl(text, persona, isCompanion);
-      await playAudioUrl(serverUrl, messageId, 10000);
+      // 方案1: 服务端 CosyVoice
+      const params = new URLSearchParams({
+        text: truncateText(clean, 300),
+        persona,
+        isCompanion: String(isCompanion),
+      });
+      const response = await fetch(`/api/tts?${params.toString()}`);
+      if (!response.ok) throw new Error('服务端TTS失败');
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      audioCache.current.set(messageId, blobUrl);
+      if (currentPlayingIdRef.current !== messageId) return;
+      await playAudioUrl(blobUrl, messageId, 3000);
     } catch (serverError) {
-      console.warn('CosyVoice TTS failed, trying Baidu TTS:', serverError);
-
+      console.warn('CosyVoice failed:', serverError);
       if (currentPlayingIdRef.current !== messageId) return;
 
       try {
-        // 方案2: 百度翻译 TTS 兜底
-        setState({
-          isPlaying: false,
-          playingId: messageId,
-          isLoading: true,
-          error: null,
-        });
-        const speed = isCompanion ? 5 : 5;
-        const baiduUrl = buildBaiduTTSUrl(text, speed);
+        // 方案2: 百度 TTS 兜底
+        const baiduUrl = `https://fanyi.baidu.com/gettts?lan=zh&text=${encodeURIComponent(truncateText(clean, 200))}&spd=5&source=web`;
         await playAudioUrl(baiduUrl, messageId, 8000);
-      } catch (baiduError) {
-        console.error('All TTS failed:', baiduError);
+      } catch {
         if (currentPlayingIdRef.current === messageId) {
           audioRef.current = null;
           currentPlayingIdRef.current = null;
-          setState({
-            isPlaying: false,
-            playingId: null,
-            isLoading: false,
-            error: '语音暂时不可用',
-          });
+          setState({ isPlaying: false, playingId: null, isLoading: false, error: '语音暂时不可用' });
         }
       }
     }
@@ -246,6 +256,9 @@ export function useTTS(options: UseTTSOptions = {}) {
     ...state,
     play,
     stop,
+    preload,
+    isPreloaded,
+    isPreloading,
     isPlayingMessage,
     isLoadingMessage,
   };
