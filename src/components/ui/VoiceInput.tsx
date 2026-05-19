@@ -1,130 +1,123 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 
 interface VoiceInputProps {
   onTranscript: (text: string) => void;
   disabled?: boolean;
-  className?: string;
 }
 
-// Web Speech API 类型声明
-interface SpeechRecognitionEvent {
-  results: SpeechRecognitionResultList;
-}
+type RecordingState = 'idle' | 'recording' | 'processing';
 
-interface SpeechRecognitionErrorEvent {
-  error: string;
-}
+export function VoiceInput({ onTranscript, disabled }: VoiceInputProps) {
+  const [state, setState] = useState<RecordingState>('idle');
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
-interface SpeechRecognitionInstance {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  start(): void;
-  stop(): void;
-  abort(): void;
-  onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
-  onend: (() => void) | null;
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition?: new () => SpeechRecognitionInstance;
-    webkitSpeechRecognition?: new () => SpeechRecognitionInstance;
-  }
-}
-
-export function VoiceInput({ onTranscript, disabled, className }: VoiceInputProps) {
-  const [isListening, setIsListening] = useState(false);
-  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
-
-  // 检测是否支持语音识别
-  const isSupported = typeof window !== 'undefined' && 
-    (window.SpeechRecognition || window.webkitSpeechRecognition);
-
-  useEffect(() => {
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.abort();
-      }
-    };
-  }, []);
-
-  const toggleListening = useCallback(() => {
-    if (isListening) {
-      // 停止
-      recognitionRef.current?.stop();
-      setIsListening(false);
-      return;
-    }
-
-    // 开始
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
-
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = 'zh-CN';
-
-    let finalTranscript = '';
-
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let interim = '';
-      for (let i = 0; i < event.results.length; i++) {
-        if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript;
-        } else {
-          interim += event.results[i][0].transcript;
-        }
-      }
-      // 实时把当前识别结果传出去
-      const current = finalTranscript + interim;
-      if (current.trim()) {
-        onTranscript(current.trim());
-      }
-    };
-
-    recognition.onerror = () => {
-      setIsListening(false);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
-    recognitionRef.current = recognition;
-
+  const startRecording = useCallback(async () => {
     try {
-      recognition.start();
-      setIsListening(true);
-    } catch {
-      setIsListening(false);
-    }
-  }, [isListening, onTranscript]);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus'
+          : 'audio/webm',
+      });
 
-  if (!isSupported) return null;
+      chunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunksRef.current.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        // 停止所有音轨
+        stream.getTracks().forEach(t => t.stop());
+
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        if (blob.size < 1000) {
+          setState('idle');
+          return;
+        }
+
+        setState('processing');
+
+        try {
+          const formData = new FormData();
+          formData.append('audio', blob, 'recording.webm');
+
+          const res = await fetch('/api/stt', {
+            method: 'POST',
+            body: formData,
+          });
+
+          const data = await res.json();
+          if (data.text) {
+            onTranscript(data.text);
+          }
+        } catch {
+          // 识别失败，静默处理
+        }
+
+        setState('idle');
+      };
+
+      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorder.start();
+      setState('recording');
+    } catch {
+      // 麦克风权限被拒绝或不支持
+      setState('idle');
+    }
+  }, [onTranscript]);
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
+  }, [state]);
+
+  const toggle = useCallback(() => {
+    if (state === 'idle') {
+      startRecording();
+    } else if (state === 'recording') {
+      stopRecording();
+    }
+  }, [state, startRecording, stopRecording]);
 
   return (
     <button
       type="button"
-      onClick={toggleListening}
-      disabled={disabled}
-      className={`flex items-center justify-center w-10 h-10 rounded-full transition-all ${
-        isListening
-          ? 'bg-red-500 text-white animate-pulse'
-          : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-      } ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className || ''}`}
-      title={isListening ? '停止录音' : '语音输入'}
+      onClick={toggle}
+      disabled={disabled || state === 'processing'}
+      className={`flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full transition-all ${
+        state === 'recording'
+          ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30'
+          : state === 'processing'
+          ? 'bg-orange-400 text-white animate-spin'
+          : 'bg-gray-100 text-gray-500 hover:bg-gray-200 active:bg-gray-300'
+      } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+      title={
+        state === 'recording' ? '点击停止录音' 
+        : state === 'processing' ? '识别中...' 
+        : '按住说话'
+      }
     >
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-        <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-        <line x1="12" y1="19" x2="12" y2="23" />
-        <line x1="8" y1="23" x2="16" y2="23" />
-      </svg>
+      {state === 'processing' ? (
+        // 加载圈
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+        </svg>
+      ) : (
+        // 麦克风图标
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+          <line x1="12" y1="19" x2="12" y2="23" />
+          <line x1="8" y1="23" x2="16" y2="23" />
+        </svg>
+      )}
     </button>
   );
 }
