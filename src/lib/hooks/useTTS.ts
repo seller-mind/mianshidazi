@@ -1,7 +1,7 @@
-// TTS 语音播放 Hook - 带预加载
-// AI消息一出现就在后台生成音频，用户点喇叭时秒出声
-// 方案1: 服务端 CosyVoice 返回音频URL，客户端直接播放
-// 方案2: 百度翻译 TTS 兜底
+// TTS 语音播放 Hook
+// 核心方案：Audio元素直接指向 /api/tts 接口播放
+// 不用fetch！Audio元素自己处理加载、重定向、播放
+// 这和之前百度TTS能出声的方式完全一样
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 
@@ -19,15 +19,15 @@ export interface UseTTSOptions {
 
 function cleanText(text: string): string {
   return text
-    .replace(/[\u{1F600}-\u{1F64F}]/gu, '') // 表情
-    .replace(/[\u{1F300}-\u{1F5FF}]/gu, '') // 符号图形
-    .replace(/[\u{1F680}-\u{1F6FF}]/gu, '') // 交通工具
-    .replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '') // 国旗
-    .replace(/[\u{2702}-\u{27B0}]/gu, '')   // 其他符号
-    .replace(/\*\*/g, '')                   // Markdown粗体
-    .replace(/#{1,6}\s/g, '')               // Markdown标题
-    .replace(/[「」『』]/g, '')              // 中文引号
-    .replace(/\n+/g, '，')                  // 换行转逗号
+    .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
+    .replace(/[\u{1F300}-\u{1F5FF}]/gu, '')
+    .replace(/[\u{1F680}-\u{1F6FF}]/gu, '')
+    .replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '')
+    .replace(/[\u{2702}-\u{27B0}]/gu, '')
+    .replace(/\*\*/g, '')
+    .replace(/#{1,6}\s/g, '')
+    .replace(/[「」『』]/g, '')
+    .replace(/\n+/g, '，')
     .trim();
 }
 
@@ -52,12 +52,10 @@ export function useTTS(options: UseTTSOptions = {}) {
     error: null,
   });
 
-  // 音频缓存: messageId → blobUrl
-  const audioCache = useRef<Map<string, string>>(new Map());
-  // 正在预加载的 messageId 集合
-  const preloadingSet = useRef<Set<string>>(new Set());
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const currentPlayingIdRef = useRef<string | null>(null);
+  // 预加载的Audio元素缓存
+  const preloadedAudios = useRef<Map<string, HTMLAudioElement>>(new Map());
 
   // 清理
   useEffect(() => {
@@ -66,139 +64,119 @@ export function useTTS(options: UseTTSOptions = {}) {
         audioRef.current.pause();
         audioRef.current = null;
       }
-      audioCache.current.forEach(url => URL.revokeObjectURL(url));
-      audioCache.current.clear();
+      preloadedAudios.current.forEach(a => { a.pause(); a.src = ''; });
+      preloadedAudios.current.clear();
     };
   }, []);
 
   const stop = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
-      audioRef.current.removeAttribute('src');
-      audioRef.current.load();
       audioRef.current = null;
     }
     currentPlayingIdRef.current = null;
-    setState({
-      isPlaying: false,
-      playingId: null,
-      isLoading: false,
-      error: null,
-    });
+    setState({ isPlaying: false, playingId: null, isLoading: false, error: null });
   }, []);
 
-  // 播放音频（支持URL或blob URL）
-  const playAudioUrl = useCallback((audioUrl: string, messageId: string, timeoutMs = 10000): Promise<void> => {
+  // 构建 /api/tts 的URL
+  const buildTtsUrl = useCallback((text: string): string => {
+    const params = new URLSearchParams({
+      text: truncateText(cleanText(text), 300),
+      persona,
+      isCompanion: String(isCompanion),
+    });
+    return `/api/tts?${params.toString()}`;
+  }, [persona, isCompanion]);
+
+  // 预加载：AI消息出现时创建Audio元素并预加载
+  const preload = useCallback((text: string, messageId: string) => {
+    if (preloadedAudios.current.has(messageId)) return;
+
+    const clean = truncateText(cleanText(text), 300);
+    if (!clean) return;
+
+    const audio = new Audio();
+    audio.preload = 'auto';
+    audio.src = buildTtsUrl(text);
+    preloadedAudios.current.set(messageId, audio);
+  }, [buildTtsUrl]);
+
+  const isPreloaded = useCallback((messageId: string) => {
+    return preloadedAudios.current.has(messageId);
+  }, []);
+
+  const isPreloading = useCallback((messageId: string) => {
+    return false;
+  }, []);
+
+  // 播放音频 - 核心方法
+  const playAudio = useCallback((audio: HTMLAudioElement, messageId: string): Promise<void> => {
     return new Promise((resolve, reject) => {
-      if (audioRef.current) {
+      // 停止当前播放
+      if (audioRef.current && audioRef.current !== audio) {
         audioRef.current.pause();
-        audioRef.current = null;
       }
 
-      const audio = new Audio();
-      audio.preload = 'auto';
       audioRef.current = audio;
       currentPlayingIdRef.current = messageId;
 
       let settled = false;
-      const timer = setTimeout(() => {
-        if (!settled) {
-          settled = true;
-          cleanup();
-          reject(new Error('播放超时'));
-        }
-      }, timeoutMs);
-
-      const cleanup = () => {
-        clearTimeout(timer);
-        audio.removeEventListener('canplay', onCanPlay);
-        audio.removeEventListener('ended', onEnded);
-        audio.removeEventListener('error', onError);
-      };
 
       const onCanPlay = () => {
         if (settled) return;
         setState({ isPlaying: true, playingId: messageId, isLoading: false, error: null });
         audio.play().catch(e => {
-          if (!settled) {
-            settled = true;
-            cleanup();
-            reject(e);
-          }
+          if (!settled) { settled = true; cleanup(); reject(e); }
         });
       };
 
       const onEnded = () => {
-        if (!settled) {
-          settled = true;
-          cleanup();
-          if (currentPlayingIdRef.current === messageId) {
-            audioRef.current = null;
-            currentPlayingIdRef.current = null;
-            setState({ isPlaying: false, playingId: null, isLoading: false, error: null });
-          }
-          resolve();
+        if (settled) return;
+        settled = true;
+        cleanup();
+        if (currentPlayingIdRef.current === messageId) {
+          audioRef.current = null;
+          currentPlayingIdRef.current = null;
+          setState({ isPlaying: false, playingId: null, isLoading: false, error: null });
         }
+        resolve();
       };
 
       const onError = () => {
-        if (!settled) {
-          settled = true;
-          cleanup();
-          reject(new Error('播放失败'));
-        }
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(new Error('音频加载失败'));
       };
 
-      audio.addEventListener('canplay', onCanPlay, { once: true });
+      const cleanup = () => {
+        audio.removeEventListener('canplaythrough', onCanPlay);
+        audio.removeEventListener('ended', onEnded);
+        audio.removeEventListener('error', onError);
+      };
+
+      audio.addEventListener('canplaythrough', onCanPlay, { once: true });
       audio.addEventListener('ended', onEnded);
       audio.addEventListener('error', onError, { once: true });
 
-      // 设置 src 后浏览器会自动开始加载
-      audio.src = audioUrl;
+      // 如果音频已经加载好了（预加载命中），直接播放
+      if (audio.readyState >= 3) { // HAVE_FUTURE_DATA
+        onCanPlay();
+        return;
+      }
+
+      // 开始加载
+      audio.load();
+
+      // 10秒超时
+      setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          cleanup();
+          reject(new Error('音频加载超时'));
+        }
+      }, 10000);
     });
-  }, []);
-
-  // 预加载：AI消息一出现就后台生成音频
-  const preload = useCallback((text: string, messageId: string) => {
-    // 已缓存或正在加载，跳过
-    if (audioCache.current.has(messageId) || preloadingSet.current.has(messageId)) return;
-
-    const clean = truncateText(cleanText(text), 300);
-    if (!clean) return;
-
-    preloadingSet.current.add(messageId);
-
-    const params = new URLSearchParams({
-      text: clean,
-      persona,
-      isCompanion: String(isCompanion),
-    });
-
-    fetch(`/api/tts?${params.toString()}`, {
-      signal: AbortSignal.timeout(15000), // 15秒客户端超时（含服务端二次下载时间）
-    })
-      .then(async res => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const blob = await res.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        audioCache.current.set(messageId, blobUrl);
-      })
-      .catch(err => {
-        console.warn('TTS preload failed:', err);
-      })
-      .finally(() => {
-        preloadingSet.current.delete(messageId);
-      });
-  }, [persona, isCompanion]);
-
-  // 检查是否已预加载完成
-  const isPreloaded = useCallback((messageId: string) => {
-    return audioCache.current.has(messageId);
-  }, []);
-
-  // 检查是否正在预加载
-  const isPreloading = useCallback((messageId: string) => {
-    return preloadingSet.current.has(messageId);
   }, []);
 
   // 主播放入口
@@ -214,58 +192,32 @@ export function useTTS(options: UseTTSOptions = {}) {
     const clean = cleanText(text);
     if (!clean) return;
 
-    // 检查缓存 → 秒出声！
-    const cachedUrl = audioCache.current.get(messageId);
-    if (cachedUrl) {
-      setState({ isPlaying: false, playingId: messageId, isLoading: true, error: null });
-      try {
-        await playAudioUrl(cachedUrl, messageId, 10000);
-        return;
-      } catch {
-        // 缓存的 blob 可能失效，清除后重新加载
-        URL.revokeObjectURL(cachedUrl);
-        audioCache.current.delete(messageId);
-      }
-    }
-
     setState({ isPlaying: false, playingId: messageId, isLoading: true, error: null });
 
     try {
-      // 服务端返回音频二进制（服务端已代理下载，避免mixed content问题）
-      const params = new URLSearchParams({
-        text: truncateText(clean, 300),
-        persona,
-        isCompanion: String(isCompanion),
-      });
+      // 1. 检查预加载缓存
+      const preloaded = preloadedAudios.current.get(messageId);
+      if (preloaded) {
+        await playAudio(preloaded, messageId);
+        return;
+      }
 
-      const response = await fetch(`/api/tts?${params.toString()}`, {
-        signal: AbortSignal.timeout(15000),
-      });
+      // 2. 创建新的Audio元素指向 /api/tts
+      const audio = new Audio();
+      audio.preload = 'auto';
+      audio.src = buildTtsUrl(text);
+      preloadedAudios.current.set(messageId, audio);
 
-      if (!response.ok) throw new Error('服务端TTS失败');
-
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      audioCache.current.set(messageId, blobUrl);
-      if (currentPlayingIdRef.current !== messageId) return;
-      await playAudioUrl(blobUrl, messageId, 10000);
-    } catch (serverError) {
-      console.warn('CosyVoice failed:', serverError);
-      if (currentPlayingIdRef.current !== messageId) return;
-
-      try {
-        // 方案2: 百度 TTS 兜底
-        const baiduUrl = `https://fanyi.baidu.com/gettts?lan=zh&text=${encodeURIComponent(truncateText(clean, 200))}&spd=5&source=web`;
-        await playAudioUrl(baiduUrl, messageId, 8000);
-      } catch {
-        if (currentPlayingIdRef.current === messageId) {
-          audioRef.current = null;
-          currentPlayingIdRef.current = null;
-          setState({ isPlaying: false, playingId: null, isLoading: false, error: '语音暂时不可用' });
-        }
+      await playAudio(audio, messageId);
+    } catch (err) {
+      console.warn('TTS play failed:', err);
+      if (currentPlayingIdRef.current === messageId) {
+        audioRef.current = null;
+        currentPlayingIdRef.current = null;
+        setState({ isPlaying: false, playingId: null, isLoading: false, error: '语音暂时不可用' });
       }
     }
-  }, [persona, isCompanion, state.isPlaying, stop, playAudioUrl]);
+  }, [state.isPlaying, stop, playAudio, buildTtsUrl]);
 
   const isPlayingMessage = useCallback((messageId: string) => {
     return state.playingId === messageId && state.isPlaying;
