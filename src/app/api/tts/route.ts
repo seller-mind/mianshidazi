@@ -71,7 +71,7 @@ async function synthesize(text: string, persona?: string, isCompanion?: boolean)
   };
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  const timeoutId = setTimeout(() => controller.abort(), 9000);
 
   try {
     const response = await fetch(TTS_URL, {
@@ -94,7 +94,7 @@ async function synthesize(text: string, persona?: string, isCompanion?: boolean)
 
     const contentType = response.headers.get('content-type') || '';
 
-    // 直接返回音频二进制
+    // 情况1：直接返回音频二进制
     if (contentType.includes('audio') || contentType.includes('octet-stream')) {
       const buf = await response.arrayBuffer();
       return new NextResponse(buf, {
@@ -102,9 +102,25 @@ async function synthesize(text: string, persona?: string, isCompanion?: boolean)
       });
     }
 
-    // 如果返回JSON（错误响应）
-    const text = await response.text();
-    console.error('CosyVoice unexpected response:', contentType, text.substring(0, 300));
+    // 情况2：返回JSON（含音频URL），需要下载音频再返回
+    const json = await response.json();
+    const audioUrl = json?.output?.audio?.url;
+    if (audioUrl) {
+      // http → https（避免Mixed Content）
+      const httpsUrl = audioUrl.replace(/^http:/, 'https:');
+      const audioResp = await fetch(httpsUrl, { signal: controller.signal });
+      if (!audioResp.ok) {
+        console.error('Audio download failed:', audioResp.status);
+        return NextResponse.json({ error: '音频下载失败' }, { status: 500 });
+      }
+      const buf = await audioResp.arrayBuffer();
+      return new NextResponse(buf, {
+        headers: { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'public, max-age=86400' },
+      });
+    }
+
+    // 情况3：JSON错误响应
+    console.error('CosyVoice unexpected response:', JSON.stringify(json).substring(0, 500));
     return NextResponse.json({ error: '语音合成返回异常' }, { status: 500 });
 
   } catch (err: unknown) {
