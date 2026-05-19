@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui';
 import { generateId } from '@/lib/utils';
-import { useTTS, isTTSSupported } from '@/lib/hooks/useTTS';
+import { useTTS } from '@/lib/hooks/useTTS';
 import { TTSPlayButton } from '@/components/ui/TTSPlayButton';
 import { AIBadge } from '@/components/AIDisclaimer';
 import type { ChatMessage } from '@/types';
@@ -250,7 +250,7 @@ export default function CompanionPage() {
               key={msg.id}
               className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-start gap-2`}
             >
-              {msg.role === 'assistant' && msg.content && isTTSSupported() && (
+              {msg.role === 'assistant' && msg.content && (
                 <TTSPlayButton
                   isPlaying={isPlayingMessage(msg.id)}
                   isLoading={isLoadingMessage(msg.id)}

@@ -1,6 +1,7 @@
-// TTS 语音播放 Hook - 使用浏览器原生 Web Speech API
-// 优势：完全客户端执行，无需服务器，零超时风险
-// 降级策略：不支持 speechSynthesis 的浏览器自动隐藏语音按钮
+// TTS 语音播放 Hook - 混合策略
+// 优先使用浏览器原生 Web Speech API（零延迟、零成本）
+// 不支持时降级到服务端 edge-tts（/api/tts，限制文本长度避免超时）
+// 按钮始终显示，错误时提示用户
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 
@@ -18,19 +19,13 @@ export interface UseTTSOptions {
 
 // 面试官人格对应的语音参数
 const PERSONA_VOICE_PARAMS: Record<string, { pitch: number; rate: number; preferGender: 'male' | 'female' }> = {
-  // 温柔鼓励型 - 女声，语速稍慢，音调稍高
   A: { pitch: 1.15, rate: 0.95, preferGender: 'female' },
-  // 真实模拟型 - 男声，正常语速
   B: { pitch: 1.0, rate: 1.0, preferGender: 'male' },
-  // 压力挑战型 - 男声，语速稍快，音调偏低
   C: { pitch: 0.9, rate: 1.05, preferGender: 'male' },
-  // 犀利毒舌型 - 女声，语速快
   D: { pitch: 1.05, rate: 1.1, preferGender: 'female' },
-  // HR老油条型 - 男声，语速慢
   E: { pitch: 0.95, rate: 0.9, preferGender: 'male' },
 };
 
-// 陪伴模式 - 女声，温柔
 const COMPANION_VOICE_PARAMS = { pitch: 1.1, rate: 0.95, preferGender: 'female' as const };
 
 // 等待语音列表加载（移动端首次可能为空）
@@ -45,51 +40,71 @@ function getVoicesReady(): Promise<SpeechSynthesisVoice[]> {
       resolve(voices);
       return;
     }
-    // 等待 voiceschanged 事件（移动端 Chrome 需要）
     const handler = () => {
-      const v = window.speechSynthesis.getVoices();
+      const v = window.speechSynthesis!.getVoices();
       if (v.length > 0) {
-        window.speechSynthesis.removeEventListener('voiceschanged', handler);
+        window.speechSynthesis!.removeEventListener('voiceschanged', handler);
         resolve(v);
       }
     };
     window.speechSynthesis.addEventListener('voiceschanged', handler);
-    // 超时兜底：3秒后无论如何继续（用空列表也行，设置 lang 即可）
     setTimeout(() => {
-      window.speechSynthesis.removeEventListener('voiceschanged', handler);
-      resolve(window.speechSynthesis.getVoices());
+      window.speechSynthesis!.removeEventListener('voiceschanged', handler);
+      resolve(window.speechSynthesis!.getVoices());
     }, 3000);
   });
 }
 
-// 选择最合适的中文语音
 function pickChineseVoice(voices: SpeechSynthesisVoice[], preferGender: 'male' | 'female'): SpeechSynthesisVoice | null {
   if (voices.length === 0) return null;
 
-  // 优先级1: zh-CN + 性别匹配
   const zhCN = voices.filter(v => v.lang === 'zh-CN');
   if (zhCN.length > 0) {
     const genderMatch = zhCN.find(v => {
       const name = v.name.toLowerCase();
       if (preferGender === 'female') return name.includes('female') || name.includes('女') || name.includes('xiao') || name.includes('hui');
-      return name.includes('male') && !name.includes('female') || name.includes('男') || name.includes('yun');
+      return (name.includes('male') && !name.includes('female')) || name.includes('男') || name.includes('yun');
     });
     if (genderMatch) return genderMatch;
     return zhCN[0];
   }
 
-  // 优先级2: 任何 zh 开头的语音
   const zhAny = voices.filter(v => v.lang.startsWith('zh'));
   if (zhAny.length > 0) return zhAny[0];
 
-  // 优先级3: 任何可用语音
   return voices[0];
 }
 
-// 检测浏览器是否支持语音合成
-export function isTTSSupported(): boolean {
-  if (typeof window === 'undefined') return false;
-  return 'speechSynthesis' in window;
+// 清理文本
+function cleanTextForSpeech(text: string): string {
+  return text
+    .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
+    .replace(/[\u{1F300}-\u{1F5FF}]/gu, '')
+    .replace(/[\u{1F680}-\u{1F6FF}]/gu, '')
+    .replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '')
+    .replace(/[\u{2702}-\u{27B0}]/gu, '')
+    .replace(/\*\*/g, '')
+    .replace(/#{1,6}\s/g, '')
+    .replace(/[「」『』]/g, '')
+    .replace(/\n+/g, '，')
+    .trim();
+}
+
+// 截断文本到安全长度（服务端 TTS 用，避免 Vercel 超时）
+function truncateForServer(text: string, maxChars = 150): string {
+  if (text.length <= maxChars) return text;
+  // 优先在句号/逗号处截断
+  const truncated = text.substring(0, maxChars);
+  const lastPunc = Math.max(truncated.lastIndexOf('。'), truncated.lastIndexOf('，'), truncated.lastIndexOf('！'), truncated.lastIndexOf('？'));
+  if (lastPunc > maxChars * 0.5) {
+    return text.substring(0, lastPunc + 1);
+  }
+  return truncated + '…';
+}
+
+// 检测是否支持 Web Speech API
+function hasNativeSpeech(): boolean {
+  return typeof window !== 'undefined' && 'speechSynthesis' in window;
 }
 
 export function useTTS(options: UseTTSOptions = {}) {
@@ -102,36 +117,39 @@ export function useTTS(options: UseTTSOptions = {}) {
     error: null,
   });
 
-  const currentUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const currentPlayingIdRef = useRef<string | null>(null);
 
-  // 预加载语音列表（某些浏览器需要异步加载）
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
-      // 触发语音列表加载
+    if (hasNativeSpeech()) {
       window.speechSynthesis.getVoices();
-      // Chrome 需要监听 onvoiceschanged 事件
       window.speechSynthesis.onvoiceschanged = () => {
-        window.speechSynthesis.getVoices();
+        window.speechSynthesis!.getVoices();
       };
     }
 
     return () => {
-      // 清理：停止播放
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
+      if (hasNativeSpeech()) {
+        window.speechSynthesis!.cancel();
       }
-      currentUtteranceRef.current = null;
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
       currentPlayingIdRef.current = null;
     };
   }, []);
 
   // 停止播放
   const stop = useCallback(() => {
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
+    if (hasNativeSpeech()) {
+      window.speechSynthesis!.cancel();
     }
-    currentUtteranceRef.current = null;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+      audioRef.current = null;
+    }
     currentPlayingIdRef.current = null;
     setState({
       isPlaying: false,
@@ -141,82 +159,26 @@ export function useTTS(options: UseTTSOptions = {}) {
     });
   }, []);
 
-  // 播放语音
-  const play = useCallback(async (text: string, messageId: string) => {
-    // 如果正在播放同一条消息，则停止
-    if (currentPlayingIdRef.current === messageId && state.isPlaying) {
-      stop();
-      return;
+  // === 方案1: 浏览器原生 Web Speech API ===
+  const playNative = useCallback(async (text: string, messageId: string, params: typeof PERSONA_VOICE_PARAMS['A']) => {
+    const voices = await getVoicesReady();
+    const voice = pickChineseVoice(voices, params.preferGender);
+    const clean = cleanTextForSpeech(text);
+
+    if (!clean) {
+      throw new Error('没有可朗读的内容');
     }
 
-    // 停止之前的播放
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-    }
+    const utterance = new SpeechSynthesisUtterance(clean);
+    utterance.lang = 'zh-CN';
+    utterance.rate = params.rate;
+    utterance.pitch = params.pitch;
+    utterance.volume = 1;
+    if (voice) utterance.voice = voice;
 
-    // 检查浏览器支持
-    if (!isTTSSupported()) {
-      setState({
-        isPlaying: false,
-        playingId: null,
-        isLoading: false,
-        error: '您的浏览器不支持语音功能',
-      });
-      return;
-    }
+    currentPlayingIdRef.current = messageId;
 
-    setState({
-      isPlaying: false,
-      playingId: messageId,
-      isLoading: true,
-      error: null,
-    });
-
-    try {
-      // 获取语音参数
-      const params = isCompanion ? COMPANION_VOICE_PARAMS : (PERSONA_VOICE_PARAMS[persona] || PERSONA_VOICE_PARAMS['A']);
-      
-      // 等待语音列表加载后选择语音
-      const voices = await getVoicesReady();
-      const voice = pickChineseVoice(voices, params.preferGender);
-
-      // 清理文本（移除 emoji 和特殊字符）
-      const cleanText = text
-        .replace(/[\u{1F600}-\u{1F64F}]/gu, '') // 表情
-        .replace(/[\u{1F300}-\u{1F5FF}]/gu, '') // 符号
-        .replace(/[\u{1F680}-\u{1F6FF}]/gu, '') // 交通
-        .replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '') // 旗帜
-        .replace(/[\u{2702}-\u{27B0}]/gu, '')   // 装饰
-        .replace(/\*\*/g, '')                    // Markdown 加粗
-        .replace(/#{1,6}\s/g, '')                // Markdown 标题
-        .replace(/[「」『』]/g, '')               // 引号
-        .replace(/\n+/g, '，')                   // 换行替换为逗号（自然停顿）
-        .trim();
-
-      if (!cleanText) {
-        setState({
-          isPlaying: false,
-          playingId: null,
-          isLoading: false,
-          error: '没有可朗读的内容',
-        });
-        return;
-      }
-
-      // 创建语音合成
-      const utterance = new SpeechSynthesisUtterance(cleanText);
-      utterance.lang = 'zh-CN';
-      utterance.rate = params.rate;
-      utterance.pitch = params.pitch;
-      utterance.volume = 1;
-
-      if (voice) {
-        utterance.voice = voice;
-      }
-
-      currentUtteranceRef.current = utterance;
-      currentPlayingIdRef.current = messageId;
-
+    return new Promise<void>((resolve, reject) => {
       utterance.onstart = () => {
         setState({
           isPlaying: true,
@@ -228,7 +190,6 @@ export function useTTS(options: UseTTSOptions = {}) {
 
       utterance.onend = () => {
         if (currentPlayingIdRef.current === messageId) {
-          currentUtteranceRef.current = null;
           currentPlayingIdRef.current = null;
           setState({
             isPlaying: false,
@@ -237,12 +198,11 @@ export function useTTS(options: UseTTSOptions = {}) {
             error: null,
           });
         }
+        resolve();
       };
 
       utterance.onerror = (event) => {
-        console.error('Speech synthesis error:', event);
         if (currentPlayingIdRef.current === messageId) {
-          currentUtteranceRef.current = null;
           currentPlayingIdRef.current = null;
           setState({
             isPlaying: false,
@@ -251,15 +211,126 @@ export function useTTS(options: UseTTSOptions = {}) {
             error: event.error === 'canceled' ? null : '语音播放失败',
           });
         }
+        reject(new Error(event.error));
       };
 
-      // 开始播放
-      window.speechSynthesis.speak(utterance);
+      window.speechSynthesis!.speak(utterance);
+    });
+  }, []);
 
+  // === 方案2: 服务端 edge-tts（文本截断避免超时）===
+  const playServer = useCallback(async (text: string, messageId: string) => {
+    const clean = cleanTextForSpeech(text);
+    if (!clean) throw new Error('没有可朗读的内容');
+
+    // 截断文本，避免 Vercel 10 秒超时
+    const safeText = truncateForServer(clean, 150);
+
+    const response = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: safeText,
+        persona,
+        isCompanion,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || '语音合成失败');
+    }
+
+    const audioBlob = await response.blob();
+    const audioUrl = URL.createObjectURL(audioBlob);
+    const audio = new Audio(audioUrl);
+    audioRef.current = audio;
+    currentPlayingIdRef.current = messageId;
+
+    return new Promise<void>((resolve, reject) => {
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+        if (currentPlayingIdRef.current === messageId) {
+          audioRef.current = null;
+          currentPlayingIdRef.current = null;
+          setState({
+            isPlaying: false,
+            playingId: null,
+            isLoading: false,
+            error: null,
+          });
+        }
+        resolve();
+      };
+
+      audio.onerror = () => {
+        URL.revokeObjectURL(audioUrl);
+        if (currentPlayingIdRef.current === messageId) {
+          audioRef.current = null;
+          currentPlayingIdRef.current = null;
+          setState({
+            isPlaying: false,
+            playingId: null,
+            isLoading: false,
+            error: '音频播放失败',
+          });
+        }
+        reject(new Error('音频播放失败'));
+      };
+
+      setState({
+        isPlaying: true,
+        playingId: messageId,
+        isLoading: false,
+        error: null,
+      });
+
+      audio.play().catch(reject);
+    });
+  }, [persona, isCompanion]);
+
+  // 播放语音（主入口）
+  const play = useCallback(async (text: string, messageId: string) => {
+    // 如果正在播放同一条消息，则停止
+    if (currentPlayingIdRef.current === messageId && state.isPlaying) {
+      stop();
+      return;
+    }
+
+    // 停止之前的播放
+    stop();
+
+    setState({
+      isPlaying: false,
+      playingId: messageId,
+      isLoading: true,
+      error: null,
+    });
+
+    try {
+      const params = isCompanion ? COMPANION_VOICE_PARAMS : (PERSONA_VOICE_PARAMS[persona] || PERSONA_VOICE_PARAMS['A']);
+
+      if (hasNativeSpeech()) {
+        // 优先用浏览器原生
+        await playNative(text, messageId, params);
+      } else {
+        // 降级到服务端 edge-tts
+        await playServer(text, messageId);
+      }
     } catch (error) {
       console.error('TTS play error:', error);
-      currentUtteranceRef.current = null;
       currentPlayingIdRef.current = null;
+
+      // 如果原生失败，尝试降级到服务端
+      if (hasNativeSpeech()) {
+        try {
+          await playServer(text, messageId);
+          return;
+        } catch (serverError) {
+          console.error('Server TTS also failed:', serverError);
+        }
+      }
+
       setState({
         isPlaying: false,
         playingId: null,
@@ -267,14 +338,12 @@ export function useTTS(options: UseTTSOptions = {}) {
         error: error instanceof Error ? error.message : '语音合成失败',
       });
     }
-  }, [persona, isCompanion, state.isPlaying, stop]);
+  }, [persona, isCompanion, state.isPlaying, stop, playNative, playServer]);
 
-  // 检查指定消息是否正在播放
   const isPlayingMessage = useCallback((messageId: string) => {
     return state.playingId === messageId && state.isPlaying;
   }, [state.playingId, state.isPlaying]);
 
-  // 检查指定消息是否正在加载
   const isLoadingMessage = useCallback((messageId: string) => {
     return state.playingId === messageId && state.isLoading;
   }, [state.playingId, state.isLoading]);
