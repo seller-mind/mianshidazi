@@ -1,6 +1,6 @@
 // TTS 语音播放 Hook - 带预加载
 // AI消息一出现就在后台生成音频，用户点喇叭时秒出声
-// 方案1: 服务端 CosyVoice（阿里云百炼，神经网络语音）
+// 方案1: 服务端 CosyVoice 返回音频URL，客户端直接播放
 // 方案2: 百度翻译 TTS 兜底
 
 import { useState, useRef, useCallback, useEffect } from 'react';
@@ -19,15 +19,15 @@ export interface UseTTSOptions {
 
 function cleanText(text: string): string {
   return text
-    .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
-    .replace(/[\u{1F300}-\u{1F5FF}]/gu, '')
-    .replace(/[\u{1F680}-\u{1F6FF}]/gu, '')
-    .replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '')
-    .replace(/[\u{2702}-\u{27B0}]/gu, '')
-    .replace(/\*\*/g, '')
-    .replace(/#{1,6}\s/g, '')
-    .replace(/[「」『』]/g, '')
-    .replace(/\n+/g, '，')
+    .replace(/[\u{1F600}-\u{1F64F}]/gu, '') // 表情
+    .replace(/[\u{1F300}-\u{1F5FF}]/gu, '') // 符号图形
+    .replace(/[\u{1F680}-\u{1F6FF}]/gu, '') // 交通工具
+    .replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '') // 国旗
+    .replace(/[\u{2702}-\u{27B0}]/gu, '')   // 其他符号
+    .replace(/\*\*/g, '')                   // Markdown粗体
+    .replace(/#{1,6}\s/g, '')               // Markdown标题
+    .replace(/[「」『』]/g, '')              // 中文引号
+    .replace(/\n+/g, '，')                  // 换行转逗号
     .trim();
 }
 
@@ -52,8 +52,8 @@ export function useTTS(options: UseTTSOptions = {}) {
     error: null,
   });
 
-  // 音频缓存: messageId → blobUrl
-  const audioCache = useRef<Map<string, string>>(new Map());
+  // 音频缓存: messageId → { type: 'url' | 'blob', value: string }
+  const audioCache = useRef<Map<string, { type: 'url' | 'blob'; value: string }>>(new Map());
   // 正在预加载的 messageId 集合
   const preloadingSet = useRef<Set<string>>(new Set());
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -66,7 +66,11 @@ export function useTTS(options: UseTTSOptions = {}) {
         audioRef.current.pause();
         audioRef.current = null;
       }
-      audioCache.current.forEach(url => URL.revokeObjectURL(url));
+      audioCache.current.forEach(cache => {
+        if (cache.type === 'blob') {
+          URL.revokeObjectURL(cache.value);
+        }
+      });
       audioCache.current.clear();
     };
   }, []);
@@ -87,6 +91,77 @@ export function useTTS(options: UseTTSOptions = {}) {
     });
   }, []);
 
+  // 播放音频（支持URL或blob URL）
+  const playAudioUrl = useCallback((audioUrl: string, messageId: string, timeoutMs = 10000): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+
+      const audio = new Audio();
+      audio.preload = 'auto';
+      audioRef.current = audio;
+      currentPlayingIdRef.current = messageId;
+
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          cleanup();
+          reject(new Error('播放超时'));
+        }
+      }, timeoutMs);
+
+      const cleanup = () => {
+        clearTimeout(timer);
+        audio.removeEventListener('canplay', onCanPlay);
+        audio.removeEventListener('ended', onEnded);
+        audio.removeEventListener('error', onError);
+      };
+
+      const onCanPlay = () => {
+        if (settled) return;
+        setState({ isPlaying: true, playingId: messageId, isLoading: false, error: null });
+        audio.play().catch(e => {
+          if (!settled) {
+            settled = true;
+            cleanup();
+            reject(e);
+          }
+        });
+      };
+
+      const onEnded = () => {
+        if (!settled) {
+          settled = true;
+          cleanup();
+          if (currentPlayingIdRef.current === messageId) {
+            audioRef.current = null;
+            currentPlayingIdRef.current = null;
+            setState({ isPlaying: false, playingId: null, isLoading: false, error: null });
+          }
+          resolve();
+        }
+      };
+
+      const onError = () => {
+        if (!settled) {
+          settled = true;
+          cleanup();
+          reject(new Error('播放失败'));
+        }
+      };
+
+      audio.addEventListener('canplay', onCanPlay, { once: true });
+      audio.addEventListener('ended', onEnded);
+      audio.addEventListener('error', onError, { once: true });
+
+      // 设置 src 后浏览器会自动开始加载
+      audio.src = audioUrl;
+    });
+  }, []);
+
   // 预加载：AI消息一出现就后台生成音频
   const preload = useCallback((text: string, messageId: string) => {
     // 已缓存或正在加载，跳过
@@ -103,14 +178,26 @@ export function useTTS(options: UseTTSOptions = {}) {
       isCompanion: String(isCompanion),
     });
 
-    fetch(`/api/tts?${params.toString()}`)
-      .then(res => {
+    fetch(`/api/tts?${params.toString()}`, {
+      signal: AbortSignal.timeout(10000), // 10秒客户端超时
+    })
+      .then(async res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.blob();
-      })
-      .then(blob => {
-        const blobUrl = URL.createObjectURL(blob);
-        audioCache.current.set(messageId, blobUrl);
+        
+        const contentType = res.headers.get('content-type') || '';
+        
+        if (contentType.includes('application/json')) {
+          // 服务端返回了URL
+          const { url } = await res.json();
+          if (url) {
+            audioCache.current.set(messageId, { type: 'url', value: url });
+          }
+        } else {
+          // 服务端返回了音频二进制
+          const blob = await res.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          audioCache.current.set(messageId, { type: 'blob', value: blobUrl });
+        }
       })
       .catch(err => {
         console.warn('TTS preload failed:', err);
@@ -130,59 +217,6 @@ export function useTTS(options: UseTTSOptions = {}) {
     return preloadingSet.current.has(messageId);
   }, []);
 
-  // 播放音频
-  const playAudioUrl = useCallback((audioUrl: string, messageId: string, timeoutMs = 12000): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-
-      const audio = new Audio(audioUrl);
-      audio.preload = 'auto';
-      audioRef.current = audio;
-      currentPlayingIdRef.current = messageId;
-
-      let settled = false;
-      const timer = setTimeout(() => {
-        if (!settled) { settled = true; cleanup(); reject(new Error('超时')); }
-      }, timeoutMs);
-
-      const cleanup = () => {
-        clearTimeout(timer);
-        audio.removeEventListener('canplay', onCanPlay);
-        audio.removeEventListener('ended', onEnded);
-        audio.removeEventListener('error', onError);
-      };
-
-      const onCanPlay = () => {
-        setState({ isPlaying: true, playingId: messageId, isLoading: false, error: null });
-        audio.play().catch(e => { if (!settled) { settled = true; cleanup(); reject(e); } });
-      };
-
-      const onEnded = () => {
-        if (!settled) {
-          settled = true; cleanup();
-          if (currentPlayingIdRef.current === messageId) {
-            audioRef.current = null;
-            currentPlayingIdRef.current = null;
-            setState({ isPlaying: false, playingId: null, isLoading: false, error: null });
-          }
-          resolve();
-        }
-      };
-
-      const onError = () => {
-        if (!settled) { settled = true; cleanup(); reject(new Error('播放失败')); }
-      };
-
-      audio.addEventListener('canplay', onCanPlay, { once: true });
-      audio.addEventListener('ended', onEnded);
-      audio.addEventListener('error', onError, { once: true });
-      audio.src = audioUrl;
-    });
-  }, []);
-
   // 主播放入口
   const play = useCallback(async (text: string, messageId: string) => {
     // 点击同一条：停止
@@ -197,15 +231,17 @@ export function useTTS(options: UseTTSOptions = {}) {
     if (!clean) return;
 
     // 检查缓存 → 秒出声！
-    const cachedUrl = audioCache.current.get(messageId);
-    if (cachedUrl) {
+    const cached = audioCache.current.get(messageId);
+    if (cached) {
       setState({ isPlaying: false, playingId: messageId, isLoading: true, error: null });
       try {
-        await playAudioUrl(cachedUrl, messageId, 3000);
+        await playAudioUrl(cached.value, messageId, 10000);
         return;
       } catch {
-        // 缓存的 blob 可能失效，清除后重新加载
-        URL.revokeObjectURL(cachedUrl);
+        // 缓存的音频可能失效，清除后重新加载
+        if (cached.type === 'blob') {
+          URL.revokeObjectURL(cached.value);
+        }
         audioCache.current.delete(messageId);
       }
     }
@@ -213,19 +249,40 @@ export function useTTS(options: UseTTSOptions = {}) {
     setState({ isPlaying: false, playingId: messageId, isLoading: true, error: null });
 
     try {
-      // 方案1: 服务端 CosyVoice
+      // 方案1: 服务端 CosyVoice（非流式，返回URL或音频二进制）
       const params = new URLSearchParams({
         text: truncateText(clean, 300),
         persona,
         isCompanion: String(isCompanion),
       });
-      const response = await fetch(`/api/tts?${params.toString()}`);
+
+      const response = await fetch(`/api/tts?${params.toString()}`, {
+        signal: AbortSignal.timeout(12000), // 12秒超时
+      });
+
       if (!response.ok) throw new Error('服务端TTS失败');
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      audioCache.current.set(messageId, blobUrl);
-      if (currentPlayingIdRef.current !== messageId) return;
-      await playAudioUrl(blobUrl, messageId, 3000);
+
+      const contentType = response.headers.get('content-type') || '';
+
+      if (contentType.includes('application/json')) {
+        // 服务端返回了URL
+        const { url } = await response.json();
+        if (url) {
+          // URL直接播放（CosyVoice返回的URL可以直接播放）
+          await playAudioUrl(url, messageId, 10000);
+          // 缓存URL以便下次使用
+          audioCache.current.set(messageId, { type: 'url', value: url });
+          return;
+        }
+        throw new Error('未返回音频URL');
+      } else {
+        // 服务端返回了音频二进制
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        audioCache.current.set(messageId, { type: 'blob', value: blobUrl });
+        if (currentPlayingIdRef.current !== messageId) return;
+        await playAudioUrl(blobUrl, messageId, 10000);
+      }
     } catch (serverError) {
       console.warn('CosyVoice failed:', serverError);
       if (currentPlayingIdRef.current !== messageId) return;
