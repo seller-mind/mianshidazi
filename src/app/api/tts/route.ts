@@ -1,86 +1,113 @@
-// TTS 语音合成 API - POST /api/tts
-// 使用微软 Edge TTS (完全免费)
+// TTS 语音合成 API
+// GET: 接受 text 查询参数，直接返回音频（适合 <audio src=""> 直接引用）
+// POST: 接受 JSON body，返回音频（向后兼容）
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getVoiceForPersona, getCompanionVoice } from '@/lib/tts/voice-config';
-import { tts, getVoices } from '@/lib/tts/edge-tts-shim';
+import { tts } from '@/lib/tts/edge-tts-shim';
 
-// GET 请求 - 返回可用音色列表
-export async function GET() {
+// 服务端最大文本长度（避免 Vercel 10 秒超时）
+const MAX_TEXT_LENGTH = 120;
+
+function truncateText(text: string): string {
+  const clean = text
+    .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
+    .replace(/[\u{1F300}-\u{1F5FF}]/gu, '')
+    .replace(/[\u{1F680}-\u{1F6FF}]/gu, '')
+    .replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '')
+    .replace(/[\u{2702}-\u{27B0}]/gu, '')
+    .replace(/\*\*/g, '')
+    .replace(/#{1,6}\s/g, '')
+    .replace(/\n+/g, '，')
+    .trim();
+
+  if (clean.length <= MAX_TEXT_LENGTH) return clean;
+
+  // 优先在标点处截断
+  const truncated = clean.substring(0, MAX_TEXT_LENGTH);
+  const lastPunc = Math.max(
+    truncated.lastIndexOf('。'),
+    truncated.lastIndexOf('，'),
+    truncated.lastIndexOf('！'),
+    truncated.lastIndexOf('？'),
+    truncated.lastIndexOf('；')
+  );
+  if (lastPunc > MAX_TEXT_LENGTH * 0.5) {
+    return clean.substring(0, lastPunc + 1);
+  }
+  return truncated;
+}
+
+// 生成音频的核心逻辑
+async function generateAudio(text: string, voice?: string, persona?: string, isCompanion?: boolean, rate?: string, pitch?: string) {
+  const safeText = truncateText(text);
+  if (!safeText) {
+    return NextResponse.json({ error: '没有可朗读的内容' }, { status: 400 });
+  }
+
+  // 获取音色
+  let voiceId: string;
+  if (voice) {
+    voiceId = voice;
+  } else if (isCompanion) {
+    voiceId = getCompanionVoice().voice;
+  } else {
+    voiceId = getVoiceForPersona(persona || 'A').voice;
+  }
+
+  const ttsOptions: { voice: string; rate?: string; pitch?: string } = { voice: voiceId };
+  if (rate) ttsOptions.rate = rate;
+  if (pitch) ttsOptions.pitch = pitch;
+
+  const audioBuffer = await tts(safeText, ttsOptions);
+  const uint8Array = new Uint8Array(audioBuffer);
+
+  return new NextResponse(uint8Array, {
+    status: 200,
+    headers: {
+      'Content-Type': 'audio/mpeg',
+      'Content-Length': uint8Array.byteLength.toString(),
+      'Cache-Control': 'public, max-age=86400',
+    },
+  });
+}
+
+// GET 请求 - 文本通过查询参数传入，直接返回音频
+// 用法: <audio src="/api/tts?text=你好&persona=A" />
+export async function GET(request: NextRequest) {
   try {
-    const voices = await getVoices();
-    // 过滤出中文音色
-    const chineseVoices = voices.filter((v: { Locale: string }) => v.Locale.startsWith('zh-'));
-    return NextResponse.json({
-      success: true,
-      voices: chineseVoices,
-    });
+    const { searchParams } = new URL(request.url);
+    const text = searchParams.get('text');
+    const voice = searchParams.get('voice') || undefined;
+    const persona = searchParams.get('persona') || undefined;
+    const isCompanion = searchParams.get('isCompanion') === 'true';
+    const rate = searchParams.get('rate') || undefined;
+    const pitch = searchParams.get('pitch') || undefined;
+
+    if (!text) {
+      return NextResponse.json({ error: '缺少 text 参数' }, { status: 400 });
+    }
+
+    return await generateAudio(text, voice, persona, isCompanion, rate, pitch);
   } catch (error) {
-    console.error('Failed to get voices:', error);
-    return NextResponse.json(
-      { error: '获取音色列表失败' },
-      { status: 500 }
-    );
+    console.error('TTS GET error:', error);
+    return NextResponse.json({ error: '语音合成失败' }, { status: 500 });
   }
 }
 
+// POST 请求 - 向后兼容
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { text, voice, persona, isCompanion, rate, pitch } = body;
 
-    // 验证必填参数
     if (!text) {
-      return NextResponse.json(
-        { error: '缺少必要参数: text' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: '缺少必要参数: text' }, { status: 400 });
     }
 
-    // 获取音色 - 优先使用指定的 voice 参数，其次根据 persona/companion 选择
-    let voiceId: string;
-    if (voice) {
-      voiceId = voice;
-    } else if (isCompanion) {
-      voiceId = getCompanionVoice().voice;
-    } else {
-      voiceId = getVoiceForPersona(persona || 'A').voice;
-    }
-
-    // 构建 tts 选项
-    const ttsOptions: { voice: string; rate?: string; pitch?: string } = {
-      voice: voiceId,
-    };
-
-    // 添加语速和音调调整（可选参数）
-    if (rate) {
-      ttsOptions.rate = rate;
-    }
-    if (pitch) {
-      ttsOptions.pitch = pitch;
-    }
-
-    // 调用 edge-tts 生成音频 (返回 Node.js Buffer)
-    const audioBuffer = await tts(text, ttsOptions);
-    
-    // 将 Node.js Buffer 转换为 Uint8Array 以供 NextResponse 使用
-    const uint8Array = new Uint8Array(audioBuffer);
-
-    // 返回音频流
-    return new NextResponse(uint8Array, {
-      status: 200,
-      headers: {
-        'Content-Type': 'audio/mpeg',
-        'Content-Length': uint8Array.byteLength.toString(),
-        'Cache-Control': 'private, max-age=3600',
-      },
-    });
-
+    return await generateAudio(text, voice, persona, isCompanion, rate, pitch);
   } catch (error) {
-    console.error('TTS API error:', error);
-    return NextResponse.json(
-      { error: 'TTS 服务发生错误，请稍后重试' },
-      { status: 500 }
-    );
+    console.error('TTS POST error:', error);
+    return NextResponse.json({ error: '语音合成失败' }, { status: 500 });
   }
 }
