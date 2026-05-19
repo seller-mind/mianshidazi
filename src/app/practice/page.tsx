@@ -8,6 +8,8 @@ import { Button, Card } from '@/components/ui';
 import { generateId } from '@/lib/utils';
 import type { PersonaType, TensionLevel } from '@/types';
 import { AIBadge } from '@/components/AIDisclaimer';
+import { useTTS } from '@/lib/hooks/useTTS';
+import { TTSPlayButton } from '@/components/ui/TTSPlayButton';
 
 interface Message {
   id: string;
@@ -28,10 +30,18 @@ function PracticeContent() {
   const [interviewEnded, setInterviewEnded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // 滚动到底部
+  // TTS 语音播放
+  const { play, preload, isPlayingMessage, isLoadingMessage } = useTTS({ persona: selectedPersona || 'A' });
+
+  // 滚动到底部 + 预加载新消息语音
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    messages.forEach(msg => {
+      if (msg.role === 'assistant' && msg.content) {
+        preload(msg.content, msg.id);
+      }
+    });
+  }, [messages, preload]);
 
   // 开始面试
   const startInterview = () => {
@@ -91,6 +101,7 @@ function PracticeContent() {
           persona: selectedPersona,
           sessionId,
           tensionType,
+          history: messages.map(m => ({ role: m.role, content: m.content })),
         }),
       });
 
@@ -343,8 +354,17 @@ function PracticeContent() {
           {messages.map((msg) => (
             <div
               key={msg.id}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-start gap-2`}
             >
+              {msg.role === 'assistant' && msg.content && (
+                <TTSPlayButton
+                  isPlaying={isPlayingMessage(msg.id)}
+                  isLoading={isLoadingMessage(msg.id)}
+                  onClick={() => play(msg.content, msg.id)}
+                  disabled={!msg.content.trim()}
+                  size="sm"
+                />
+              )}
               <div
                 className={`max-w-[85%] px-4 py-3 rounded-2xl ${
                   msg.role === 'user'

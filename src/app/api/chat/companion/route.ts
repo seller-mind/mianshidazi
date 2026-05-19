@@ -14,7 +14,7 @@ const companionContexts: Map<string, {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { message, context, sessionId } = body;
+    const { message, context, sessionId, history } = body;
 
     // 验证必填参数
     if (!message || !sessionId) {
@@ -41,6 +41,11 @@ export async function POST(request: NextRequest) {
 
     // 更新上下文
     companionContext.context = validContext;
+
+    // 如果客户端传了history，用它覆盖内存中的历史（确保一致性）
+    if (history && Array.isArray(history) && history.length > 0) {
+      companionContext.messages = history.filter((m: { role: string; content: string }) => m.role === 'user' || m.role === 'assistant');
+    }
 
     // 构建Prompt（包含历史消息）V9版
     const systemPrompt = getCompanionPromptWithHistory(validContext, companionContext.messages);

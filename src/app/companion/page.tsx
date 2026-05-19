@@ -88,6 +88,7 @@ export default function CompanionPage() {
           message: input.trim(),
           context,
           sessionId,
+          history: messages.map(m => ({ role: m.role, content: m.content })),
         }),
       });
 

@@ -17,7 +17,7 @@ const sessionContexts: Map<string, {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { message, persona, sessionId, interviewType, resume, tensionType } = body;
+    const { message, persona, sessionId, interviewType, resume, tensionType, history } = body;
 
     // 验证必填参数
     if (!message || !persona || !sessionId) {
@@ -51,6 +51,11 @@ export async function POST(request: NextRequest) {
     } else {
       // 更新人格（如果切换了）
       context.persona = persona;
+    }
+
+    // 如果客户端传了history，用它覆盖内存中的历史（确保一致性）
+    if (history && Array.isArray(history) && history.length > 0) {
+      context.messages = history.filter((m: { role: string; content: string }) => m.role === 'user' || m.role === 'assistant');
     }
 
     // 获取面试官Prompt (V9版)
