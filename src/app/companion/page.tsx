@@ -7,6 +7,7 @@ import { generateId } from '@/lib/utils';
 import { useTTS } from '@/lib/hooks/useTTS';
 import { TTSPlayButton } from '@/components/ui/TTSPlayButton';
 import { AIBadge } from '@/components/AIDisclaimer';
+import { VoiceInput } from '@/components/ui/VoiceInput';
 import type { ChatMessage } from '@/types';
 
 interface Message {
@@ -303,7 +304,11 @@ export default function CompanionPage() {
       {/* 输入框 */}
       <div className="bg-[#252542] border-t border-gray-800 px-4 py-4">
         <div className="max-w-2xl mx-auto">
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-end">
+            <VoiceInput
+              onTranscript={(text) => setInput(text)}
+              disabled={isLoading}
+            />
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}

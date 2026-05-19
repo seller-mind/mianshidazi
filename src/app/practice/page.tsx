@@ -8,6 +8,7 @@ import { Button, Card } from '@/components/ui';
 import { generateId } from '@/lib/utils';
 import type { PersonaType, TensionLevel } from '@/types';
 import { AIBadge } from '@/components/AIDisclaimer';
+import { VoiceInput } from '@/components/ui/VoiceInput';
 import { useTTS } from '@/lib/hooks/useTTS';
 import { TTSPlayButton } from '@/components/ui/TTSPlayButton';
 
@@ -417,7 +418,11 @@ function PracticeContent() {
       {!interviewEnded && (
         <footer className="bg-white dark:bg-[#252542] border-t border-gray-100 dark:border-gray-800 px-6 py-4">
           <div className="max-w-2xl mx-auto">
-            <div className="flex gap-3">
+            <div className="flex gap-3 items-end">
+              <VoiceInput
+                onTranscript={(text) => setInput(text)}
+                disabled={isLoading}
+              />
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}

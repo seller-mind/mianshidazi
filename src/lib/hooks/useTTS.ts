@@ -1,6 +1,7 @@
 // TTS 语音播放 Hook
-// 方案：fetch /api/tts 获取音频URL → Audio 直接播放
-// 预加载：AI消息出现时立即后台请求URL并预缓冲音频
+// 方案：fetch /api/tts 获取音频URL → 下载完整音频为blob → 播放blob URL
+// 好处：本地播放不依赖网络，不会中断
+// 预加载：AI消息出现时立即后台下载音频
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 
@@ -62,9 +63,9 @@ export function useTTS(options: UseTTSOptions = {}) {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const currentPlayingIdRef = useRef<string | null>(null);
-  // 预加载缓存: messageId → audioUrl
-  const preloadedUrls = useRef<Map<string, string>>(new Map());
-  // 预加载中的Promise: messageId → Promise
+  // 预加载缓存: messageId → blobUrl
+  const preloadedBlobs = useRef<Map<string, string>>(new Map());
+  // 预加载中的Promise
   const preloadingPromises = useRef<Map<string, Promise<string | null>>>(new Map());
 
   // 清理
@@ -74,8 +75,8 @@ export function useTTS(options: UseTTSOptions = {}) {
         audioRef.current.pause();
         audioRef.current = null;
       }
-      preloadedUrls.current.clear();
-      preloadingPromises.current.clear();
+      preloadedBlobs.current.forEach(url => URL.revokeObjectURL(url));
+      preloadedBlobs.current.clear();
     };
   }, []);
 
@@ -99,45 +100,51 @@ export function useTTS(options: UseTTSOptions = {}) {
     return `/api/tts?${params.toString()}`;
   }, [persona, isCompanion]);
 
-  // 请求TTS API获取音频URL
-  const fetchAudioUrl = useCallback(async (text: string): Promise<string | null> => {
+  // 获取音频blob URL：请求API拿到音频URL → 下载音频 → 转blob URL
+  const fetchAudioBlob = useCallback(async (text: string): Promise<string | null> => {
     try {
-      const response = await fetch(buildTtsUrl(text));
-      if (!response.ok) return null;
+      // 1. 请求API获取音频URL
+      const apiResponse = await fetch(buildTtsUrl(text));
+      if (!apiResponse.ok) return null;
 
-      const data = await response.json();
-      if (data.error) return null;
-      return data.url || null;
+      const data = await apiResponse.json();
+      if (data.error || !data.url) return null;
+
+      // 2. 下载完整音频文件
+      const audioResponse = await fetch(data.url);
+      if (!audioResponse.ok) return null;
+
+      const blob = await audioResponse.blob();
+      if (blob.size === 0) return null;
+
+      // 3. 创建本地blob URL
+      return URL.createObjectURL(blob);
     } catch {
       return null;
     }
   }, [buildTtsUrl]);
 
-  // 预加载：AI消息出现时立即请求URL + 预缓冲音频
+  // 预加载
   const preload = useCallback((text: string, messageId: string) => {
-    if (preloadedUrls.current.has(messageId)) return;
+    if (preloadedBlobs.current.has(messageId)) return;
     if (preloadingPromises.current.has(messageId)) return;
 
     const clean = truncateText(cleanText(text), 500);
     if (!clean) return;
 
-    const promise = fetchAudioUrl(text).then(url => {
+    const promise = fetchAudioBlob(text).then(blobUrl => {
       preloadingPromises.current.delete(messageId);
-      if (url) {
-        preloadedUrls.current.set(messageId, url);
-        // 预缓冲音频文件
-        const audio = new Audio(url);
-        audio.preload = 'auto';
-        audio.load();
+      if (blobUrl) {
+        preloadedBlobs.current.set(messageId, blobUrl);
       }
-      return url;
+      return blobUrl;
     });
 
     preloadingPromises.current.set(messageId, promise);
-  }, [fetchAudioUrl]);
+  }, [fetchAudioBlob]);
 
   const isPreloaded = useCallback((messageId: string) => {
-    return preloadedUrls.current.has(messageId);
+    return preloadedBlobs.current.has(messageId);
   }, []);
 
   const isPreloading = useCallback(() => false, []);
@@ -159,35 +166,38 @@ export function useTTS(options: UseTTSOptions = {}) {
     currentPlayingIdRef.current = messageId;
 
     try {
-      let audioUrl: string | null = null;
+      let blobUrl: string | null = null;
 
       // 1. 检查预加载缓存
-      audioUrl = preloadedUrls.current.get(messageId) || null;
+      blobUrl = preloadedBlobs.current.get(messageId) || null;
 
       // 2. 检查正在预加载的Promise
-      if (!audioUrl) {
+      if (!blobUrl) {
         const pending = preloadingPromises.current.get(messageId);
         if (pending) {
-          audioUrl = await pending;
+          blobUrl = await pending;
         }
       }
 
-      // 3. 都没有，直接请求
-      if (!audioUrl) {
-        audioUrl = await fetchAudioUrl(text);
+      // 3. 都没有，直接请求下载
+      if (!blobUrl) {
+        blobUrl = await fetchAudioBlob(text);
       }
 
-      if (!audioUrl) {
+      if (!blobUrl) {
         throw new Error('语音暂时不可用');
       }
 
       // 缓存
-      preloadedUrls.current.set(messageId, audioUrl);
+      preloadedBlobs.current.set(messageId, blobUrl);
 
-      // 播放
-      if (currentPlayingIdRef.current !== messageId) return; // 已被取消
+      // 被取消了
+      if (currentPlayingIdRef.current !== messageId) {
+        return;
+      }
 
-      const audio = new Audio(audioUrl);
+      // 播放本地blob URL - 不会因为网络中断
+      const audio = new Audio(blobUrl);
       audioRef.current = audio;
 
       await new Promise<void>((resolve, reject) => {
@@ -228,6 +238,7 @@ export function useTTS(options: UseTTSOptions = {}) {
         audio.addEventListener('ended', onEnded);
         audio.addEventListener('error', onError, { once: true });
 
+        // blob URL是本地的，几乎瞬间canplay
         if (audio.readyState >= 3) {
           onCanPlay();
           return;
@@ -235,14 +246,13 @@ export function useTTS(options: UseTTSOptions = {}) {
 
         audio.load();
 
-        // 15秒超时
         setTimeout(() => {
           if (!settled) {
             settled = true;
             cleanup();
             reject(new Error('音频加载超时'));
           }
-        }, 15000);
+        }, 10000);
       });
 
     } catch (err: unknown) {
@@ -254,7 +264,7 @@ export function useTTS(options: UseTTSOptions = {}) {
         setState({ isPlaying: false, playingId: null, isLoading: false, error: error.message || '语音暂时不可用' });
       }
     }
-  }, [state.isPlaying, stop, fetchAudioUrl]);
+  }, [state.isPlaying, stop, fetchAudioBlob]);
 
   const isPlayingMessage = useCallback((messageId: string) => {
     return state.playingId === messageId && state.isPlaying;
