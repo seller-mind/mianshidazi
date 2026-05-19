@@ -33,17 +33,42 @@ const PERSONA_VOICE_PARAMS: Record<string, { pitch: number; rate: number; prefer
 // 陪伴模式 - 女声，温柔
 const COMPANION_VOICE_PARAMS = { pitch: 1.1, rate: 0.95, preferGender: 'female' as const };
 
-// 选择最合适的中文语音
-function pickChineseVoice(preferGender: 'male' | 'female'): SpeechSynthesisVoice | null {
-  if (typeof window === 'undefined' || !window.speechSynthesis) return null;
+// 等待语音列表加载（移动端首次可能为空）
+function getVoicesReady(): Promise<SpeechSynthesisVoice[]> {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
+      resolve([]);
+      return;
+    }
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      resolve(voices);
+      return;
+    }
+    // 等待 voiceschanged 事件（移动端 Chrome 需要）
+    const handler = () => {
+      const v = window.speechSynthesis.getVoices();
+      if (v.length > 0) {
+        window.speechSynthesis.removeEventListener('voiceschanged', handler);
+        resolve(v);
+      }
+    };
+    window.speechSynthesis.addEventListener('voiceschanged', handler);
+    // 超时兜底：3秒后无论如何继续（用空列表也行，设置 lang 即可）
+    setTimeout(() => {
+      window.speechSynthesis.removeEventListener('voiceschanged', handler);
+      resolve(window.speechSynthesis.getVoices());
+    }, 3000);
+  });
+}
 
-  const voices = window.speechSynthesis.getVoices();
+// 选择最合适的中文语音
+function pickChineseVoice(voices: SpeechSynthesisVoice[], preferGender: 'male' | 'female'): SpeechSynthesisVoice | null {
   if (voices.length === 0) return null;
 
   // 优先级1: zh-CN + 性别匹配
   const zhCN = voices.filter(v => v.lang === 'zh-CN');
   if (zhCN.length > 0) {
-    // 尝试按名称猜测性别（常见模式）
     const genderMatch = zhCN.find(v => {
       const name = v.name.toLowerCase();
       if (preferGender === 'female') return name.includes('female') || name.includes('女') || name.includes('xiao') || name.includes('hui');
@@ -151,8 +176,9 @@ export function useTTS(options: UseTTSOptions = {}) {
       // 获取语音参数
       const params = isCompanion ? COMPANION_VOICE_PARAMS : (PERSONA_VOICE_PARAMS[persona] || PERSONA_VOICE_PARAMS['A']);
       
-      // 选择语音
-      const voice = pickChineseVoice(params.preferGender);
+      // 等待语音列表加载后选择语音
+      const voices = await getVoicesReady();
+      const voice = pickChineseVoice(voices, params.preferGender);
 
       // 清理文本（移除 emoji 和特殊字符）
       const cleanText = text
