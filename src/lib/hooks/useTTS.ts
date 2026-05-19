@@ -151,7 +151,7 @@ export function useTTS(options: UseTTSOptions = {}) {
   const playAudioFromUrl = useCallback(async (blobUrl: string, messageId: string): Promise<void> => {
     return new Promise((resolve, reject) => {
       // 停止当前播放
-      if (audioRef.current && audioRef.current !== blobUrl) {
+      if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.src = '';
       }
