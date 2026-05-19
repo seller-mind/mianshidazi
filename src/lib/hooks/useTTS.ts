@@ -52,8 +52,8 @@ export function useTTS(options: UseTTSOptions = {}) {
     error: null,
   });
 
-  // 音频缓存: messageId → { type: 'url' | 'blob', value: string }
-  const audioCache = useRef<Map<string, { type: 'url' | 'blob'; value: string }>>(new Map());
+  // 音频缓存: messageId → blobUrl
+  const audioCache = useRef<Map<string, string>>(new Map());
   // 正在预加载的 messageId 集合
   const preloadingSet = useRef<Set<string>>(new Set());
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -66,11 +66,7 @@ export function useTTS(options: UseTTSOptions = {}) {
         audioRef.current.pause();
         audioRef.current = null;
       }
-      audioCache.current.forEach(cache => {
-        if (cache.type === 'blob') {
-          URL.revokeObjectURL(cache.value);
-        }
-      });
+      audioCache.current.forEach(url => URL.revokeObjectURL(url));
       audioCache.current.clear();
     };
   }, []);
@@ -179,25 +175,13 @@ export function useTTS(options: UseTTSOptions = {}) {
     });
 
     fetch(`/api/tts?${params.toString()}`, {
-      signal: AbortSignal.timeout(10000), // 10秒客户端超时
+      signal: AbortSignal.timeout(15000), // 15秒客户端超时（含服务端二次下载时间）
     })
       .then(async res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        
-        const contentType = res.headers.get('content-type') || '';
-        
-        if (contentType.includes('application/json')) {
-          // 服务端返回了URL
-          const { url } = await res.json();
-          if (url) {
-            audioCache.current.set(messageId, { type: 'url', value: url });
-          }
-        } else {
-          // 服务端返回了音频二进制
-          const blob = await res.blob();
-          const blobUrl = URL.createObjectURL(blob);
-          audioCache.current.set(messageId, { type: 'blob', value: blobUrl });
-        }
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        audioCache.current.set(messageId, blobUrl);
       })
       .catch(err => {
         console.warn('TTS preload failed:', err);
@@ -231,17 +215,15 @@ export function useTTS(options: UseTTSOptions = {}) {
     if (!clean) return;
 
     // 检查缓存 → 秒出声！
-    const cached = audioCache.current.get(messageId);
-    if (cached) {
+    const cachedUrl = audioCache.current.get(messageId);
+    if (cachedUrl) {
       setState({ isPlaying: false, playingId: messageId, isLoading: true, error: null });
       try {
-        await playAudioUrl(cached.value, messageId, 10000);
+        await playAudioUrl(cachedUrl, messageId, 10000);
         return;
       } catch {
-        // 缓存的音频可能失效，清除后重新加载
-        if (cached.type === 'blob') {
-          URL.revokeObjectURL(cached.value);
-        }
+        // 缓存的 blob 可能失效，清除后重新加载
+        URL.revokeObjectURL(cachedUrl);
         audioCache.current.delete(messageId);
       }
     }
@@ -249,7 +231,7 @@ export function useTTS(options: UseTTSOptions = {}) {
     setState({ isPlaying: false, playingId: messageId, isLoading: true, error: null });
 
     try {
-      // 方案1: 服务端 CosyVoice（非流式，返回URL或音频二进制）
+      // 服务端返回音频二进制（服务端已代理下载，避免mixed content问题）
       const params = new URLSearchParams({
         text: truncateText(clean, 300),
         persona,
@@ -257,32 +239,16 @@ export function useTTS(options: UseTTSOptions = {}) {
       });
 
       const response = await fetch(`/api/tts?${params.toString()}`, {
-        signal: AbortSignal.timeout(12000), // 12秒超时
+        signal: AbortSignal.timeout(15000),
       });
 
       if (!response.ok) throw new Error('服务端TTS失败');
 
-      const contentType = response.headers.get('content-type') || '';
-
-      if (contentType.includes('application/json')) {
-        // 服务端返回了URL
-        const { url } = await response.json();
-        if (url) {
-          // URL直接播放（CosyVoice返回的URL可以直接播放）
-          await playAudioUrl(url, messageId, 10000);
-          // 缓存URL以便下次使用
-          audioCache.current.set(messageId, { type: 'url', value: url });
-          return;
-        }
-        throw new Error('未返回音频URL');
-      } else {
-        // 服务端返回了音频二进制
-        const blob = await response.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        audioCache.current.set(messageId, { type: 'blob', value: blobUrl });
-        if (currentPlayingIdRef.current !== messageId) return;
-        await playAudioUrl(blobUrl, messageId, 10000);
-      }
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      audioCache.current.set(messageId, blobUrl);
+      if (currentPlayingIdRef.current !== messageId) return;
+      await playAudioUrl(blobUrl, messageId, 10000);
     } catch (serverError) {
       console.warn('CosyVoice failed:', serverError);
       if (currentPlayingIdRef.current !== messageId) return;

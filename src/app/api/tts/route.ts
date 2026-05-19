@@ -109,7 +109,7 @@ async function synthesizeNonStream(
   }
 
   try {
-    // 使用 AbortController 设置 8 秒超时
+    // Vercel Hobby 10秒硬限制，CosyVoice通常2-3秒返回URL，下载音频0.1秒
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
 
@@ -153,10 +153,31 @@ async function synthesizeNonStream(
     // 情况2: 返回 JSON（包含 URL 或 base64）
     const data = await response.json();
     
-    // 优先返回音频 URL（24小时有效）
+    // 获取音频URL（24小时有效），但服务端下载后返回音频数据
+    // 不直接返回URL给客户端，避免 mixed content（http URL在https站点被拦截）
     const audioUrl = data.output?.audio?.url;
     if (audioUrl) {
-      return NextResponse.json({ url: audioUrl });
+      // 将http替换为https（OSS支持https访问）
+      const httpsUrl = audioUrl.replace(/^http:\/\//, 'https://');
+      try {
+        const audioResp = await fetch(httpsUrl, {
+          signal: AbortSignal.timeout(5000),
+        });
+        if (audioResp.ok) {
+          const audioBuffer = Buffer.from(await audioResp.arrayBuffer());
+          return new NextResponse(audioBuffer, {
+            status: 200,
+            headers: {
+              'Content-Type': 'audio/mpeg',
+              'Content-Length': audioBuffer.byteLength.toString(),
+              'Cache-Control': 'public, max-age=86400',
+            },
+          });
+        }
+      } catch (e) {
+        console.error('Failed to download audio from URL:', e);
+      }
+      // URL下载失败，继续尝试base64
     }
 
     // 备选：返回 base64 音频数据
