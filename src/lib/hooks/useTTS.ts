@@ -1,7 +1,7 @@
 // TTS 语音播放 Hook
-// 核心方案：fetch + blob 方式
-// 原因：可以检查 response.ok 和 content-type，如果API返回错误可以立即知道
-// Audio(src) 方式如果服务端返回JSON错误，Audio不会报error，只会永远loading
+// 核心方案：fetch /api/tts 获取音频URL → Audio 播放
+// API返回 { url } 或 { error }，不会超时（只请求CosyVoice，不下载音频）
+// 拿到URL后 Audio 元素直接播放，浏览器自己下载
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 
@@ -55,36 +55,30 @@ export function useTTS(options: UseTTSOptions = {}) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const currentPlayingIdRef = useRef<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  // 预加载的 blob URL 缓存
+  // 预加载的音频URL缓存
   const preloadedUrls = useRef<Map<string, string>>(new Map());
 
   // 清理
   useEffect(() => {
     return () => {
-      // 停止播放
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
       }
-      // 取消进行中的请求
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
       }
-      // 清理预加载的 blob URL
-      preloadedUrls.current.forEach(url => URL.revokeObjectURL(url));
       preloadedUrls.current.clear();
     };
   }, []);
 
   const stop = useCallback(() => {
-    // 停止当前播放
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.src = '';
       audioRef.current = null;
     }
-    // 取消进行中的请求
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
@@ -103,35 +97,20 @@ export function useTTS(options: UseTTSOptions = {}) {
     return `/api/tts?${params.toString()}`;
   }, [persona, isCompanion]);
 
-  // 预加载：fetch + blob 方式
+  // 预加载：先获取音频URL
   const preload = useCallback(async (text: string, messageId: string) => {
     if (preloadedUrls.current.has(messageId)) return;
 
     const clean = truncateText(cleanText(text), 800);
     if (!clean) return;
 
-    const controller = new AbortController();
-
     try {
-      const response = await fetch(buildTtsUrl(text), {
-        signal: controller.signal,
-      });
+      const response = await fetch(buildTtsUrl(text));
+      if (!response.ok) return;
 
-      if (!response.ok) {
-        console.warn('TTS preload failed:', response.status);
-        return;
-      }
-
-      const contentType = response.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        console.warn('TTS preload got JSON error');
-        return;
-      }
-
-      const blob = await response.blob();
-      if (blob.size > 0) {
-        const blobUrl = URL.createObjectURL(blob);
-        preloadedUrls.current.set(messageId, blobUrl);
+      const data = await response.json();
+      if (data.url) {
+        preloadedUrls.current.set(messageId, data.url);
       }
     } catch (err: unknown) {
       const error = err as Error;
@@ -147,20 +126,27 @@ export function useTTS(options: UseTTSOptions = {}) {
 
   const isPreloading = useCallback(() => false, []);
 
-  // 播放音频 - fetch + blob 方式
-  const playAudioFromUrl = useCallback(async (blobUrl: string, messageId: string): Promise<void> => {
+  // 播放音频URL
+  const playAudioFromUrl = useCallback((audioUrl: string, messageId: string): Promise<void> => {
     return new Promise((resolve, reject) => {
-      // 停止当前播放
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.src = '';
       }
 
-      const audio = new Audio(blobUrl);
+      const audio = new Audio(audioUrl);
       audioRef.current = audio;
       currentPlayingIdRef.current = messageId;
 
       let settled = false;
+
+      const onCanPlay = () => {
+        if (settled) return;
+        setState({ isPlaying: true, playingId: messageId, isLoading: false, error: null });
+        audio.play().catch(err => {
+          if (!settled) { settled = true; cleanup(); reject(err); }
+        });
+      };
 
       const onEnded = () => {
         if (settled) return;
@@ -182,21 +168,31 @@ export function useTTS(options: UseTTSOptions = {}) {
       };
 
       const cleanup = () => {
+        audio.removeEventListener('canplaythrough', onCanPlay);
         audio.removeEventListener('ended', onEnded);
         audio.removeEventListener('error', onError);
       };
 
+      audio.addEventListener('canplaythrough', onCanPlay, { once: true });
       audio.addEventListener('ended', onEnded);
-      audio.addEventListener('error', onError);
+      audio.addEventListener('error', onError, { once: true });
 
-      setState({ isPlaying: true, playingId: messageId, isLoading: false, error: null });
-      audio.play().catch(err => {
+      // 如果已经缓存好，直接播放
+      if (audio.readyState >= 3) {
+        onCanPlay();
+        return;
+      }
+
+      audio.load();
+
+      // 15秒超时（音频文件下载可能较慢）
+      setTimeout(() => {
         if (!settled) {
           settled = true;
           cleanup();
-          reject(err);
+          reject(new Error('音频加载超时'));
         }
-      });
+      }, 15000);
     });
   }, []);
 
@@ -215,19 +211,18 @@ export function useTTS(options: UseTTSOptions = {}) {
 
     setState({ isPlaying: false, playingId: messageId, isLoading: true, error: null });
 
-    // 创建新的 AbortController
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
     try {
-      let blobUrl: string | null = null;
+      let audioUrl: string | null = null;
 
       // 1. 检查预加载缓存
       const preloaded = preloadedUrls.current.get(messageId);
       if (preloaded) {
-        blobUrl = preloaded;
+        audioUrl = preloaded;
       } else {
-        // 2. 直接fetch获取blob
+        // 2. fetch获取音频URL
         const response = await fetch(buildTtsUrl(text), {
           signal: controller.signal,
         });
@@ -236,34 +231,27 @@ export function useTTS(options: UseTTSOptions = {}) {
           throw new Error(`请求失败: ${response.status}`);
         }
 
-        const contentType = response.headers.get('content-type') || '';
-        if (contentType.includes('application/json')) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || '语音合成失败');
+        const data = await response.json();
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        if (!data.url) {
+          throw new Error('未获取到音频URL');
         }
 
-        const blob = await response.blob();
-        if (blob.size === 0) {
-          throw new Error('音频为空');
-        }
-
-        blobUrl = URL.createObjectURL(blob);
-        // 存入预加载缓存
-        preloadedUrls.current.set(messageId, blobUrl);
+        audioUrl = data.url;
+        preloadedUrls.current.set(messageId, data.url);
       }
 
-      if (!blobUrl) {
-        throw new Error('无法获取音频');
+      if (!audioUrl) {
+        throw new Error('未获取到音频URL');
       }
 
-      await playAudioFromUrl(blobUrl, messageId);
+      await playAudioFromUrl(audioUrl, messageId);
 
     } catch (err: unknown) {
       const error = err as Error;
-      // AbortError 忽略
-      if (error.name === 'AbortError') {
-        return;
-      }
+      if (error.name === 'AbortError') return;
 
       console.warn('TTS play failed:', error.message);
       if (currentPlayingIdRef.current === messageId) {

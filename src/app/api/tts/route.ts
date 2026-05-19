@@ -1,28 +1,22 @@
 // TTS API - 阿里云百炼 CosyVoice
-// 音色全部不带instruction，确保兼容cosyvoice-v3-flash
-// 返回 audio/mpeg 音频数据
+// 返回 JSON { url, error } 格式
+// 客户端拿到音频URL后 Audio 直接播放，避免服务端代理下载超时
 
 import { NextRequest, NextResponse } from 'next/server';
 
 const DASHSCOPE_API_KEY = process.env.DASHSCOPE_API_KEY;
 const TTS_URL = 'https://dashscope.aliyuncs.com/api/v1/services/audio/tts/SpeechSynthesizer';
 
-// 音色映射 - 全部用v3音色，不带instruction确保兼容
-// A(温柔鼓励): 优雅知性女-温柔版
-// B(真实模拟): 清爽利落男
-// C(压力挑战): 智慧青年男
-// D(犀利毒舌): 优雅知性女-犀利版
-// E(HR老油条): 呆板大暖男
-// Companion: 知性积极女-语音助手音色
-const PERSONA_VOICE: Record<string, { voice: string; rate: number }> = {
-  A: { voice: 'longanwen_v3', rate: 1.0 },
-  B: { voice: 'longanlang_v3', rate: 1.0 },
-  C: { voice: 'longcheng_v3', rate: 1.0 },
-  D: { voice: 'longyingmu_v3', rate: 1.0 },
-  E: { voice: 'longzhe_v3', rate: 1.0 },
+// 音色映射 - 全部用v3音色，rate统一1.0
+const PERSONA_VOICE: Record<string, { voice: string }> = {
+  A: { voice: 'longanwen_v3' },
+  B: { voice: 'longanlang_v3' },
+  C: { voice: 'longcheng_v3' },
+  D: { voice: 'longyingmu_v3' },
+  E: { voice: 'longzhe_v3' },
 };
 
-const COMPANION_VOICE = { voice: 'longxiaochun_v3', rate: 1.0 };
+const COMPANION_VOICE = { voice: 'longxiaochun_v3' };
 
 function cleanText(text: string): string {
   return text
@@ -51,7 +45,6 @@ function truncateText(text: string, maxLen = 800): string {
 
 async function synthesize(text: string, persona?: string, isCompanion?: boolean): Promise<NextResponse> {
   if (!DASHSCOPE_API_KEY) {
-    console.error('TTS: DASHSCOPE_API_KEY not configured');
     return NextResponse.json({ error: 'TTS API Key 未配置' }, { status: 500 });
   }
 
@@ -67,11 +60,11 @@ async function synthesize(text: string, persona?: string, isCompanion?: boolean)
     voice: voiceConfig.voice,
     format: 'mp3',
     sample_rate: 22050,
-    rate: voiceConfig.rate,
+    rate: 1.0,
   };
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 9000);
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
 
   try {
     const response = await fetch(TTS_URL, {
@@ -89,12 +82,26 @@ async function synthesize(text: string, persona?: string, isCompanion?: boolean)
     if (!response.ok) {
       const errorText = await response.text();
       console.error('CosyVoice error:', response.status, errorText.substring(0, 500));
-      return NextResponse.json({ error: '语音合成失败', detail: errorText }, { status: 500 });
+      return NextResponse.json({ error: '语音合成失败' }, { status: 500 });
     }
 
     const contentType = response.headers.get('content-type') || '';
 
-    // 情况1：直接返回音频二进制
+    // 情况1：CosyVoice返回JSON（含音频URL）
+    if (contentType.includes('application/json')) {
+      const json = await response.json();
+      const audioUrl = json?.output?.audio?.url;
+      if (audioUrl) {
+        // http → https（避免Mixed Content）
+        const httpsUrl = audioUrl.replace(/^http:/, 'https:');
+        return NextResponse.json({ url: httpsUrl });
+      }
+      // JSON里没有URL = 错误
+      console.error('CosyVoice JSON no URL:', JSON.stringify(json).substring(0, 500));
+      return NextResponse.json({ error: '语音合成返回异常' }, { status: 500 });
+    }
+
+    // 情况2：直接返回音频二进制（罕见，兜底）
     if (contentType.includes('audio') || contentType.includes('octet-stream')) {
       const buf = await response.arrayBuffer();
       return new NextResponse(buf, {
@@ -102,25 +109,9 @@ async function synthesize(text: string, persona?: string, isCompanion?: boolean)
       });
     }
 
-    // 情况2：返回JSON（含音频URL），需要下载音频再返回
-    const json = await response.json();
-    const audioUrl = json?.output?.audio?.url;
-    if (audioUrl) {
-      // http → https（避免Mixed Content）
-      const httpsUrl = audioUrl.replace(/^http:/, 'https:');
-      const audioResp = await fetch(httpsUrl, { signal: controller.signal });
-      if (!audioResp.ok) {
-        console.error('Audio download failed:', audioResp.status);
-        return NextResponse.json({ error: '音频下载失败' }, { status: 500 });
-      }
-      const buf = await audioResp.arrayBuffer();
-      return new NextResponse(buf, {
-        headers: { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'public, max-age=86400' },
-      });
-    }
-
-    // 情况3：JSON错误响应
-    console.error('CosyVoice unexpected response:', JSON.stringify(json).substring(0, 500));
+    // 情况3：其他
+    const text = await response.text();
+    console.error('CosyVoice unexpected:', contentType, text.substring(0, 300));
     return NextResponse.json({ error: '语音合成返回异常' }, { status: 500 });
 
   } catch (err: unknown) {
