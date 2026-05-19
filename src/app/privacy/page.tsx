@@ -118,7 +118,8 @@ export default function PrivacyPage() {
       <p>如果您对本隐私政策有任何疑问或担忧，请联系我们：</p>
       <ul>
         <li><strong>运营主体</strong>：面试搭子服务团队</li>
-        <li><strong>联系邮箱</strong>：privacy@mianshidazi.com</li>
+        <li><strong>联系邮箱</strong>：haimozhouqiu@outlook.com</li>
+        <li><strong>微信号</strong>：txd027</li>
         <li><strong>服务说明</strong>：本服务部署于海外服务器，数据存储于新加坡数据中心</li>
       </ul>
 
