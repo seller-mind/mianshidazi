@@ -94,12 +94,16 @@ export function useTTS(options: UseTTSOptions = {}) {
   }, [persona, isCompanion]);
 
   // 预加载：创建Audio元素，让浏览器提前缓冲
+  // 用URL作为缓存key，内容变了会重新加载
   const preload = useCallback((text: string, messageId: string) => {
-    if (preloadedAudios.current.has(messageId)) return;
-
     const url = buildUrl(text);
+    const existing = preloadedAudios.current.get(messageId);
+    // 如果已有且URL相同，不重复加载
+    if (existing && existing.dataset.url === url) return;
+
     const audio = new Audio();
     audio.preload = 'auto';
+    audio.dataset.url = url;
     audio.src = url;
     preloadedAudios.current.set(messageId, audio);
   }, [buildUrl]);
@@ -123,12 +127,15 @@ export function useTTS(options: UseTTSOptions = {}) {
     setState({ isPlaying: false, playingId: messageId, isLoading: true, error: null });
     playingIdRef.current = messageId;
 
-    // 获取Audio元素（预加载的或新建的）
+    // 获取Audio元素（确保URL和当前文本一致）
+    const url = buildUrl(text);
     let audio = preloadedAudios.current.get(messageId);
-    if (!audio) {
+    if (!audio || audio.dataset.url !== url) {
+      // 预加载的URL和当前文本不一致，重建Audio
       audio = new Audio();
       audio.preload = 'auto';
-      audio.src = buildUrl(text);
+      audio.dataset.url = url;
+      audio.src = url;
       preloadedAudios.current.set(messageId, audio);
     }
 

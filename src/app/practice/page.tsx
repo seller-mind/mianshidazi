@@ -34,15 +34,21 @@ function PracticeContent() {
   // TTS 语音播放
   const { play, preload, isPlayingMessage, isLoadingMessage } = useTTS({ persona: selectedPersona || 'A' });
 
-  // 滚动到底部 + 预加载新消息语音
+  // 滚动到底部
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    messages.forEach(msg => {
-      if (msg.role === 'assistant' && msg.content) {
-        preload(msg.content, msg.id);
-      }
-    });
-  }, [messages, preload]);
+  }, [messages]);
+
+  // 预加载语音：只在AI回复完成后（不在加载中）才预加载
+  useEffect(() => {
+    if (!isLoading) {
+      messages.forEach(msg => {
+        if (msg.role === 'assistant' && msg.content) {
+          preload(msg.content, msg.id);
+        }
+      });
+    }
+  }, [isLoading, messages, preload]);
 
   // 开始面试
   const startInterview = () => {

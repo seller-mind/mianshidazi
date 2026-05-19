@@ -27,15 +27,21 @@ export default function CompanionPage() {
   // TTS 语音播放 - 阿搭陪伴使用专属音色
   const { play, preload, isPlayingMessage, isLoadingMessage } = useTTS({ isCompanion: true });
 
-  // 滚动到底部 + 预加载新消息语音
+  // 滚动到底部
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    messages.forEach(msg => {
-      if (msg.role === 'assistant' && msg.content) {
-        preload(msg.content, msg.id);
-      }
-    });
-  }, [messages, preload]);
+  }, [messages]);
+
+  // 预加载语音：只在AI回复完成后才预加载，避免流式内容不完整
+  useEffect(() => {
+    if (!isLoading) {
+      messages.forEach(msg => {
+        if (msg.role === 'assistant' && msg.content) {
+          preload(msg.content, msg.id);
+        }
+      });
+    }
+  }, [isLoading, messages, preload]);
 
   // 初始化欢迎消息
   useEffect(() => {
