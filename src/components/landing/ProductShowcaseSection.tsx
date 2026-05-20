@@ -36,7 +36,7 @@ export function ProductShowcaseSection() {
     {
       emoji: '🎭',
       title: 'KPI面识别',
-      description: '教你识别"等两小时面十分钟"不是你的问题。有机构数据支撑，不是编的。',
+      description: '机构数据支撑，教你识别"等两小时面十分钟"不是你的问题。',
       color: 'from-purple-50 to-violet-50 dark:from-purple-900/20 dark:to-violet-900/20',
       tag: '独家功能',
     },
