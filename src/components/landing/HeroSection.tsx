@@ -53,9 +53,9 @@ export function HeroSection() {
 
         {/* CTA按钮 */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-          <Link href="/practice">
-            <Button size="lg" className="animate-pulse-glow w-full sm:w-auto">
-              🎯 模拟面试
+          <Link href="/diagnose">
+            <Button variant="outline" size="lg" className="w-full sm:w-auto">
+              🔍 紧张类型测试
             </Button>
           </Link>
           <Link href="/companion">
@@ -63,9 +63,9 @@ export function HeroSection() {
               💬 先和阿搭聊聊
             </Button>
           </Link>
-          <Link href="/diagnose">
-            <Button variant="outline" size="lg" className="w-full sm:w-auto">
-              🔍 紧张类型测试
+          <Link href="/practice">
+            <Button size="lg" className="animate-pulse-glow w-full sm:w-auto">
+              🎯 模拟面试
             </Button>
           </Link>
         </div>
