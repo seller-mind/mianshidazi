@@ -45,7 +45,9 @@ function cleanText(text: string): string {
     .replace(/啊[啊哈]+[，,！!。？?]/g, '，')
     .replace(/^嗯[，,]/, '')
     .replace(/^哦[，,]/, '')
-    .replace(/\n+/g, '。')
+    // 节奏控制：换行→分号（≈400ms停顿），而非句号（≈600ms太长）
+    .replace(/\n+/g, '；')
+    .replace(/；{2,}/g, '；')
     .replace(/。{2,}/g, '。')
     .replace(/，{2,}/g, '，')
     .trim();

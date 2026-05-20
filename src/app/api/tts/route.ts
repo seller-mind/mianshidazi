@@ -1,5 +1,6 @@
 // TTS API - 阿里云百炼 CosyVoice
 // 分段版：客户端已拆段，服务端只负责单段合成，不截断
+// 节奏调优：rate=0.9 对话语速 + 标点控制停顿节奏
 
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -15,6 +16,10 @@ const PERSONA_VOICE: Record<string, string> = {
 };
 const COMPANION_VOICE = 'longxiaochun_v3';
 
+// 对话节奏参数
+const COMPANION_RATE = 0.9;  // 陪伴模式：稍慢，像朋友聊天
+const INTERVIEW_RATE = 0.95; // 面试模式：正常略慢，清晰沉稳
+
 function cleanText(text: string): string {
   return text
     .replace(/[（(][^）)]*[）)]/g, '')
@@ -27,7 +32,7 @@ function cleanText(text: string): string {
     .replace(/#{1,6}\s/g, '')
     .replace(/[「」『』]/g, '')
     .replace(/[～~]/g, '，')
-    // 语气词自然化：TTS对纯语气词发音别扭，替换为自然短句
+    // 语气词自然化
     .replace(/哎哟[，,！!。？?]/g, '是这样，')
     .replace(/哎呦[，,！!。？?]/g, '嗯，')
     .replace(/哎呀[，,！!。？?]/g, '嗯，')
@@ -43,7 +48,9 @@ function cleanText(text: string): string {
     .replace(/啊[啊哈]+[，,！!。？?]/g, '，')
     .replace(/^嗯[，,]/, '')
     .replace(/^哦[，,]/, '')
-    .replace(/\n+/g, '。')
+    // 节奏控制：换行→分号（≈400ms停顿，自然对话节奏），而非句号（≈600ms太长）
+    .replace(/\n+/g, '；')
+    .replace(/；{2,}/g, '；')
     .replace(/。{2,}/g, '。')
     .replace(/，{2,}/g, '，')
     .trim();
@@ -59,13 +66,13 @@ export async function GET(request: NextRequest) {
   const persona = searchParams.get('persona') || 'A';
   const isCompanion = searchParams.get('isCompanion') === 'true';
 
-  // 客户端已经拆成100字小段，服务端不再截断
   const text = cleanText(rawText);
   if (!text) {
     return NextResponse.json({ error: '没有可朗读的内容' }, { status: 400 });
   }
 
   const voice = isCompanion ? COMPANION_VOICE : (PERSONA_VOICE[persona] || PERSONA_VOICE['A']);
+  const rate = isCompanion ? COMPANION_RATE : INTERVIEW_RATE;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 9000);
@@ -79,7 +86,7 @@ export async function GET(request: NextRequest) {
       },
       body: JSON.stringify({
         model: 'cosyvoice-v3-flash',
-        input: { text, voice, format: 'mp3', sample_rate: 22050, rate: 1.0 },
+        input: { text, voice, format: 'mp3', sample_rate: 22050, rate },
       }),
       signal: controller.signal,
     });
@@ -97,7 +104,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '语音合成异常' }, { status: 500 });
     }
 
-    // 只返回URL，不下载音频
     return NextResponse.json({ url: audioUrl.replace(/^http:/, 'https:') });
 
   } catch (err: unknown) {
