@@ -1,5 +1,5 @@
-// TTS 语音播放 Hook - 分段版 v2
-// 修复：1) 单段请求失败重试 2) 播放失败跳过不中断 3) 语气词自然化
+// TTS 语音播放 Hook - v3
+// 修复跳读：减少分段数量（300字一段），避免并行请求过多导致API限流丢段
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 
@@ -15,7 +15,7 @@ export interface UseTTSOptions {
   isCompanion?: boolean;
 }
 
-const SEGMENT_LEN = 100;
+const SEGMENT_LEN = 300; // 300字一段，减少分段数量避免限流
 
 function cleanText(text: string): string {
   return text
@@ -29,7 +29,12 @@ function cleanText(text: string): string {
     .replace(/#{1,6}\s/g, '')
     .replace(/[「」『』]/g, '')
     .replace(/[～~]/g, '，')
-    // 语气词自然化：TTS对纯语气词发音别扭，替换为自然短句
+    .replace(/✅/g, '')
+    .replace(/✨/g, '')
+    .replace(/👉/g, '')
+    .replace(/💡/g, '')
+    .replace(/🔥/g, '')
+    // 语气词自然化
     .replace(/哎哟[，,！!。？?]/g, '是这样，')
     .replace(/哎呦[，,！!。？?]/g, '嗯，')
     .replace(/哎呀[，,！!。？?]/g, '嗯，')
@@ -45,7 +50,7 @@ function cleanText(text: string): string {
     .replace(/啊[啊哈]+[，,！!。？?]/g, '，')
     .replace(/^嗯[，,]/, '')
     .replace(/^哦[，,]/, '')
-    // 节奏控制：换行→分号（≈400ms停顿），而非句号（≈600ms太长）
+    // 节奏控制：换行→分号（≈400ms停顿）
     .replace(/\n+/g, '；')
     .replace(/；{2,}/g, '；')
     .replace(/。{2,}/g, '。')
@@ -67,15 +72,15 @@ function splitIntoSegments(text: string, maxChars = SEGMENT_LEN): string[] {
     }
 
     let splitPos = -1;
-    for (let i = Math.min(remaining.length - 1, maxChars); i >= Math.max(0, maxChars * 0.4); i--) {
+    for (let i = Math.min(remaining.length - 1, maxChars); i >= Math.max(0, maxChars * 0.3); i--) {
       if ('。！？；'.includes(remaining[i])) {
         splitPos = i + 1;
         break;
       }
     }
     if (splitPos === -1) {
-      for (let i = Math.min(remaining.length - 1, maxChars); i >= Math.max(0, maxChars * 0.4); i--) {
-        if ('，、'.includes(remaining[i])) {
+      for (let i = Math.min(remaining.length - 1, maxChars); i >= Math.max(0, maxChars * 0.3); i--) {
+        if ('，、：'.includes(remaining[i])) {
           splitPos = i + 1;
           break;
         }
@@ -90,50 +95,43 @@ function splitIntoSegments(text: string, maxChars = SEGMENT_LEN): string[] {
   return segments;
 }
 
-// 请求单段音频URL（带重试）
-async function fetchSegmentUrl(text: string, persona: string, isCompanion: boolean, retries = 1): Promise<string | null> {
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const params = new URLSearchParams({ text, persona, isCompanion: String(isCompanion) });
-      const res = await fetch(`/api/tts?${params.toString()}`);
-      if (!res.ok) {
-        if (attempt < retries) {
-          await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
-          continue;
-        }
-        return null;
-      }
-      const data = await res.json();
-      if (data.url) return data.url;
-      if (attempt < retries) {
-        await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
-        continue;
-      }
-      return null;
-    } catch {
-      if (attempt < retries) {
-        await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
-        continue;
-      }
-      return null;
-    }
-  }
-  return null;
-}
-
-// 并行请求所有段URL，保持顺序
+// 串行请求每段URL（避免并行限流）
 async function fetchAllSegmentUrls(text: string, persona: string, isCompanion: boolean): Promise<string[]> {
   const clean = cleanText(text);
   if (!clean) return [];
 
   const segments = splitIntoSegments(clean, SEGMENT_LEN);
-  const results = await Promise.all(
-    segments.map((seg, i) => fetchSegmentUrl(seg, persona, isCompanion).then(url => ({ url, index: i })))
-  );
+  const urls: string[] = [];
 
-  // 按原始顺序排列
-  results.sort((a, b) => a.index - b.index);
-  return results.map(r => r.url).filter((u): u is string => u !== null);
+  for (let i = 0; i < segments.length; i++) {
+    try {
+      const params = new URLSearchParams({ text: segments[i], persona, isCompanion: String(isCompanion) });
+      const res = await fetch(`/api/tts?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.url) {
+          urls.push(data.url);
+          continue;
+        }
+      }
+      // 失败重试一次
+      await new Promise(r => setTimeout(r, 500));
+      const retryRes = await fetch(`/api/tts?${params.toString()}`);
+      if (retryRes.ok) {
+        const retryData = await retryRes.json();
+        if (retryData.url) {
+          urls.push(retryData.url);
+          continue;
+        }
+      }
+      // 两次都失败，跳过这段（但不中断后续）
+      console.warn(`TTS segment ${i} failed, skipping`);
+    } catch {
+      console.warn(`TTS segment ${i} error, skipping`);
+    }
+  }
+
+  return urls;
 }
 
 export function useTTS(options: UseTTSOptions = {}) {
@@ -189,8 +187,8 @@ export function useTTS(options: UseTTSOptions = {}) {
 
   const isPreloading = useCallback(() => false, []);
 
-  // 播放单个Audio（容错：失败不中断后续，超时8秒跳过）
-  const playAudio = useCallback((url: string, timeoutMs = 8000): Promise<void> => {
+  // 播放单个Audio（容错）
+  const playAudio = useCallback((url: string, timeoutMs = 15000): Promise<void> => {
     return new Promise((resolve) => {
       const audio = new Audio();
       audio.preload = 'auto';
@@ -201,11 +199,11 @@ export function useTTS(options: UseTTSOptions = {}) {
         if (resolved) return;
         resolved = true;
         cleanup();
-        resolve(); // 永远resolve，不中断后续播放
+        resolve();
       };
 
       const onEnded = () => done();
-      const onError = () => done(); // 播放失败跳过
+      const onError = () => done();
       const cleanup = () => {
         audio.removeEventListener('ended', onEnded);
         audio.removeEventListener('error', onError);
@@ -215,7 +213,6 @@ export function useTTS(options: UseTTSOptions = {}) {
       audio.addEventListener('ended', onEnded);
       audio.addEventListener('error', onError);
 
-      // 超时保护
       const timer = setTimeout(() => {
         audio.pause();
         done();
@@ -245,7 +242,6 @@ export function useTTS(options: UseTTSOptions = {}) {
 
       setState({ isPlaying: true, playingId: messageId, isLoading: false, error: null });
 
-      // 连续播放所有段，单段失败不影响后续
       for (const url of urls) {
         if (playCtx.aborted) return;
         await playAudio(url);
