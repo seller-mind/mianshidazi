@@ -36,37 +36,37 @@ export function PainPointSection() {
   ];
 
   return (
-    <section className="py-20 px-6 bg-white dark:bg-[#1A1A2E]">
+    <section className="py-10 md:py-20 px-4 md:px-6 bg-white dark:bg-[#1A1A2E]">
       <div className="max-w-4xl mx-auto">
         {/* 标题 */}
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-[#1F2937] dark:text-white mb-4">
+        <div className="text-center mb-8 md:mb-16">
+          <h2 className="text-2xl md:text-4xl font-bold text-[#1F2937] dark:text-white mb-3 md:mb-4">
             面试紧张，是你最大的敌人
           </h2>
-          <p className="text-lg text-[#6B7280] dark:text-gray-400">
+          <p className="text-sm md:text-lg text-[#6B7280] dark:text-gray-400">
             这些场景，你是不是也经历过？
           </p>
         </div>
 
         {/* 痛点卡片 */}
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
           {painPoints.map((point, index) => (
             <div
               key={index}
-              className={`bg-gradient-to-br ${point.color} rounded-2xl p-6 border border-gray-100 dark:border-gray-800 transform hover:scale-[1.02] transition-transform`}
+              className={`bg-gradient-to-br ${point.color} rounded-2xl p-4 md:p-6 border border-gray-100 dark:border-gray-800 transform hover:scale-[1.02] transition-transform`}
             >
-              <div className="flex items-start gap-4">
-                <span className="text-4xl">{point.emoji}</span>
-                <div>
-                  <h3 className="text-lg font-semibold text-[#1F2937] dark:text-white mb-2">
+              <div className="flex items-start gap-3 md:gap-4">
+                <span className="text-2xl md:text-4xl flex-shrink-0">{point.emoji}</span>
+                <div className="min-w-0">
+                  <h3 className="text-base md:text-lg font-semibold text-[#1F2937] dark:text-white mb-1.5 md:mb-2">
                     {point.title}
                   </h3>
-                  <p className="text-[#6B7280] dark:text-gray-400 text-sm leading-relaxed mb-4">
+                  <p className="text-xs md:text-sm text-[#6B7280] dark:text-gray-400 leading-relaxed mb-3 md:mb-4">
                     {point.description}
                   </p>
                   {/* 阿搭的真实来源话术 */}
-                  <div className="bg-white/80 dark:bg-[#1A1A2E]/80 rounded-xl p-3">
-                    <p className="text-xs text-[#FF6B35] italic" style={{ whiteSpace: 'pre-wrap' }}>
+                  <div className="bg-white/80 dark:bg-[#1A1A2E]/80 rounded-xl p-2.5 md:p-3">
+                    <p className="text-[10px] md:text-xs text-[#FF6B35] italic" style={{ whiteSpace: 'pre-wrap' }}>
                       {point.quote}
                     </p>
                   </div>
@@ -77,27 +77,27 @@ export function PainPointSection() {
         </div>
 
         {/* V9 新增：紧张类型测试入口 */}
-        <div className="mt-12 bg-gradient-to-r from-[#FF6B35]/10 to-[#E55A28]/10 dark:from-[#FF6B35]/5 dark:to-[#E55A28]/5 rounded-2xl p-8 text-center">
-          <h3 className="text-xl font-semibold text-[#1F2937] dark:text-white mb-3">
+        <div className="mt-8 md:mt-12 bg-gradient-to-r from-[#FF6B35]/10 to-[#E55A28]/10 dark:from-[#FF6B35]/5 dark:to-[#E55A28]/5 rounded-2xl p-5 md:p-8 text-center">
+          <h3 className="text-base md:text-xl font-semibold text-[#1F2937] dark:text-white mb-2 md:mb-3">
             🔍 找到你紧张的根本原因
           </h3>
-          <p className="text-[#6B7280] dark:text-gray-400 mb-6 max-w-lg mx-auto">
+          <p className="text-xs md:text-base text-[#6B7280] dark:text-gray-400 mb-4 md:mb-6 max-w-lg mx-auto">
             5种紧张类型，5种不同的应对方法。先诊断，再练习，才能真正解决。
           </p>
           <Link href="/diagnose">
-            <button className="px-6 py-3 bg-[#FF6B35] text-white font-medium rounded-xl hover:bg-[#E55A28] transition-colors">
+            <button className="px-5 py-2.5 md:px-6 md:py-3 bg-[#FF6B35] text-white text-sm md:text-base font-medium rounded-xl hover:bg-[#E55A28] transition-colors">
               免费做紧张类型测试 →
             </button>
           </Link>
         </div>
 
         {/* 阿搭对话气泡 */}
-        <div className="mt-12 flex gap-4 max-w-lg mx-auto">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B35] to-[#E55A28] flex items-center justify-center text-white font-medium flex-shrink-0">
-            阿
+        <div className="mt-8 md:mt-12 flex gap-3 md:gap-4 max-w-lg mx-auto">
+          <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-[#FF6B35] to-[#E55A28] flex items-center justify-center text-white text-xs md:text-sm font-medium flex-shrink-0">
+            搭
           </div>
-          <div className="bg-[#F9FAFB] dark:bg-[#252542] rounded-2xl rounded-tl-md p-4 shadow-lg">
-            <p className="text-sm text-[#6B7280] dark:text-gray-400 leading-relaxed" style={{ whiteSpace: 'pre-wrap' }}>
+          <div className="bg-[#F9FAFB] dark:bg-[#252542] rounded-2xl rounded-tl-md p-3 md:p-4 shadow-lg">
+            <p className="text-xs md:text-sm text-[#6B7280] dark:text-gray-400 leading-relaxed" style={{ whiteSpace: 'pre-wrap' }}>
               "紧张不是你的敌人，是你的信号。
               问题是，你一直没学会怎么跟它相处。"
             </p>
