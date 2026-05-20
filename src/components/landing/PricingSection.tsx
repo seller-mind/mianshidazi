@@ -63,24 +63,24 @@ export function PricingSection() {
         {/* 标题 */}
         <div className="text-center mb-8 md:mb-12">
           <h2 className="text-2xl md:text-4xl font-bold text-[#1F2937] dark:text-white mb-3 md:mb-4">
-            模拟面试，收费；其他的，免费
+            模拟面试，开启你的蜕变
           </h2>
           <p className="text-sm md:text-lg text-[#6B7280] dark:text-gray-400">
-            紧张类型测试和阿搭聊天永久免费，只有模拟面试收费
+            紧张测试和陪伴聊天始终免费，模拟面试按次付费
           </p>
         </div>
 
         {/* 免费功能说明 */}
         <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-2xl p-4 md:p-6 mb-8 md:mb-12 max-w-2xl mx-auto border border-green-200 dark:border-green-800">
           <div className="flex items-start gap-2 md:gap-3">
-            <span className="text-xl md:text-2xl flex-shrink-0">🆓</span>
+            <span className="text-xl md:text-2xl flex-shrink-0">🎁</span>
             <div>
-              <p className="font-medium text-green-700 dark:text-green-400 text-sm md:text-base mb-1.5 md:mb-2">永久免费</p>
+              <p className="font-medium text-green-700 dark:text-green-400 text-sm md:text-base mb-1.5 md:mb-2">这些，永远不收费</p>
               <p className="text-xs md:text-sm text-green-600 dark:text-green-300 leading-relaxed">
-                紧张类型测试 — 5种紧张类型，精准定位你的问题根源
+                紧张类型测试 — 测出你的紧张类型，找到对症的解法
               </p>
               <p className="text-xs md:text-sm text-green-600 dark:text-green-300 leading-relaxed mt-1">
-                阿搭聊天 — 面试前紧张、面试后崩溃、等通知焦虑，随时找阿搭聊
+                阿搭聊天 — 面试前后随时聊，紧张了有人接住你
               </p>
             </div>
           </div>
