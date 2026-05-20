@@ -14,7 +14,7 @@ export function ProductShowcaseSection() {
     },
     {
       emoji: '🤖',
-      title: 'AI面试官',
+      title: '模拟面试',
       description: '5种人格可选：温柔鼓励型帮你建立信心，真实模拟型帮你适应节奏，压力挑战型帮你脱敏。',
       color: 'from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20',
       tag: '核心功能',
