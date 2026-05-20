@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, Suspense } from 'react';
+import { useState, useRef, useEffect, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { PERSONA_CONFIGS } from '@/lib/ai/prompts';
@@ -9,6 +9,7 @@ import { generateId } from '@/lib/utils';
 import type { PersonaType, TensionLevel } from '@/types';
 import { AIBadge } from '@/components/AIDisclaimer';
 import { VoiceInput } from '@/components/ui/VoiceInput';
+import { VoiceMessageBubble } from '@/components/ui/VoiceMessageBubble';
 import { useTTS } from '@/lib/hooks/useTTS';
 import { TTSPlayButton } from '@/components/ui/TTSPlayButton';
 
@@ -16,6 +17,10 @@ interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  isVoice?: boolean;
+  voiceUrl?: string;
+  voiceDurationMs?: number;
+  voiceTranscript?: string;
 }
 
 function PracticeContent() {
@@ -39,16 +44,14 @@ function PracticeContent() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // 预加载语音：只在AI回复完成后（不在加载中）才预加载
+  // 预加载语音：所有AI消息立即预加载
   useEffect(() => {
-    if (!isLoading) {
-      messages.forEach(msg => {
-        if (msg.role === 'assistant' && msg.content) {
-          preload(msg.content, msg.id);
-        }
-      });
-    }
-  }, [isLoading, messages, preload]);
+    messages.forEach(msg => {
+      if (msg.role === 'assistant' && msg.content) {
+        preload(msg.content, msg.id);
+      }
+    });
+  }, [messages, preload]);
 
   // 开始面试
   const startInterview = () => {
@@ -223,6 +226,141 @@ function PracticeContent() {
     window.location.href = `/report?session=${sessionId}`;
   };
 
+  // 语音发送
+  const handleVoiceSend = useCallback(async (blob: Blob, durationMs: number) => {
+    if (isLoading || !selectedPersona) return;
+
+    // 上传获取URL
+    const formData = new FormData();
+    formData.append('audio', blob, 'voice.webm');
+
+    let voiceUrl = '';
+    try {
+      const uploadRes = await fetch('/api/voice-upload', { method: 'POST', body: formData });
+      if (uploadRes.ok) {
+        const uploadData = await uploadRes.json();
+        voiceUrl = uploadData.url || '';
+      }
+    } catch { /* ignore */ }
+
+    // 语音识别
+    let transcript = '';
+    try {
+      const sttFormData = new FormData();
+      sttFormData.append('audio', blob, 'voice.webm');
+      const sttRes = await fetch('/api/stt', { method: 'POST', body: sttFormData });
+      if (sttRes.ok) {
+        const sttData = await sttRes.json();
+        transcript = sttData.text || '';
+      }
+    } catch { /* ignore */ }
+
+    const voiceMessage: Message = {
+      id: generateId(),
+      role: 'user',
+      content: transcript || '(语音消息)',
+      isVoice: true,
+      voiceUrl,
+      voiceDurationMs: durationMs,
+    };
+
+    setMessages(prev => [...prev, voiceMessage]);
+
+    if (transcript) {
+      setIsLoading(true);
+      try {
+        const response = await fetch('/api/chat/interview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: transcript,
+            persona: selectedPersona,
+            sessionId,
+            tensionType,
+            history: messages.map(m => ({ role: m.role, content: m.content })),
+          }),
+        });
+
+        if (!response.ok) throw new Error('发送失败');
+        if (!response.body) throw new Error('响应体为空');
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let assistantMessage = '';
+        const assistantId = generateId();
+
+        setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '' }]);
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') {
+                if (!assistantMessage.trim()) {
+                  setMessages(prev =>
+                    prev.map(msg =>
+                      msg.id === assistantId
+                        ? { ...msg, content: '抱歉，暂时无法回复，请稍后重试。' }
+                        : msg
+                    )
+                  );
+                }
+                break;
+              }
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.error) {
+                  setMessages(prev =>
+                    prev.map(msg =>
+                      msg.id === assistantId
+                        ? { ...msg, content: `出错了: ${parsed.error}` }
+                        : msg
+                    )
+                  );
+                  break;
+                }
+                if (parsed.content) {
+                  assistantMessage += parsed.content;
+                  setMessages(prev =>
+                    prev.map(msg =>
+                      msg.id === assistantId
+                        ? { ...msg, content: assistantMessage }
+                        : msg
+                    )
+                  );
+                }
+              } catch { /* ignore */ }
+            }
+          }
+        }
+      } catch (error) {
+        setMessages(prev => [
+          ...prev,
+          { id: generateId(), role: 'assistant', content: `抱歉，出了点问题: ${error instanceof Error ? error.message : '请稍后重试'}` },
+        ]);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  }, [isLoading, selectedPersona, sessionId, tensionType, messages]);
+
+  // 语音转文字
+  const handleVoiceTranscript = useCallback((messageId: string, text: string) => {
+    setMessages(prev =>
+      prev.map(msg =>
+        msg.id === messageId
+          ? { ...msg, voiceTranscript: text }
+          : msg
+      )
+    );
+  }, []);
+
   // 键盘发送
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -372,6 +510,21 @@ function PracticeContent() {
                   size="sm"
                 />
               )}
+              {msg.isVoice && msg.voiceUrl ? (
+                <div className={msg.role === 'user' ? 'flex flex-col items-end gap-1' : 'flex flex-col items-start gap-1'}>
+                  <VoiceMessageBubble
+                    audioUrl={msg.voiceUrl}
+                    durationMs={msg.voiceDurationMs || 1000}
+                    isUser={msg.role === 'user'}
+                    onTranscript={msg.voiceTranscript ? undefined : (text) => handleVoiceTranscript(msg.id, text)}
+                  />
+                  {msg.voiceTranscript && (
+                    <p className="text-xs text-gray-400 max-w-[85%] px-2">
+                      {msg.voiceTranscript}
+                    </p>
+                  )}
+                </div>
+              ) : (
               <div
                 className={`max-w-[85%] px-4 py-3 rounded-2xl ${
                   msg.role === 'user'
@@ -387,6 +540,7 @@ function PracticeContent() {
                 )}
                 {msg.content}
               </div>
+              )}
             </div>
           ))}
           
@@ -426,7 +580,7 @@ function PracticeContent() {
           <div className="max-w-2xl mx-auto">
             <div className="flex gap-3 items-end">
               <VoiceInput
-                onTranscript={(text) => setInput(text)}
+                onVoiceSend={handleVoiceSend}
                 disabled={isLoading}
               />
               <textarea

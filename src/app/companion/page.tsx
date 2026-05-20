@@ -8,12 +8,17 @@ import { useTTS } from '@/lib/hooks/useTTS';
 import { TTSPlayButton } from '@/components/ui/TTSPlayButton';
 import { AIBadge } from '@/components/AIDisclaimer';
 import { VoiceInput } from '@/components/ui/VoiceInput';
-import type { ChatMessage } from '@/types';
+import { VoiceMessageBubble } from '@/components/ui/VoiceMessageBubble';
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  // 语音消息
+  isVoice?: boolean;
+  voiceUrl?: string;
+  voiceDurationMs?: number;
+  voiceTranscript?: string; // 转文字结果
 }
 
 export default function CompanionPage() {
@@ -32,16 +37,14 @@ export default function CompanionPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // 预加载语音：只在AI回复完成后才预加载，避免流式内容不完整
+  // 预加载语音：所有AI消息都预加载（包括欢迎消息）
   useEffect(() => {
-    if (!isLoading) {
-      messages.forEach(msg => {
-        if (msg.role === 'assistant' && msg.content) {
-          preload(msg.content, msg.id);
-        }
-      });
-    }
-  }, [isLoading, messages, preload]);
+    messages.forEach(msg => {
+      if (msg.role === 'assistant' && msg.content) {
+        preload(msg.content, msg.id);
+      }
+    });
+  }, [messages, preload]);
 
   // 初始化欢迎消息
   useEffect(() => {
@@ -74,13 +77,13 @@ export default function CompanionPage() {
   }, []);
 
   // 发送消息
-  const sendMessage = async () => {
-    if (!input.trim() || isLoading) return;
+  const sendMessage = async (text: string) => {
+    if (!text.trim() || isLoading) return;
 
     const userMessage: Message = {
       id: generateId(),
       role: 'user',
-      content: input.trim(),
+      content: text.trim(),
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -92,7 +95,7 @@ export default function CompanionPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: input.trim(),
+          message: text.trim(),
           context,
           sessionId,
           history: messages.map(m => ({ role: m.role, content: m.content })),
@@ -126,7 +129,6 @@ export default function CompanionPage() {
           if (line.startsWith('data: ')) {
             const data = line.slice(6);
             if (data === '[DONE]') {
-              // 检查是否有错误
               if (!assistantMessage.trim()) {
                 setMessages(prev =>
                   prev.map(msg =>
@@ -140,7 +142,6 @@ export default function CompanionPage() {
             }
             try {
               const parsed = JSON.parse(data);
-              // 处理错误响应
               if (parsed.error) {
                 setMessages(prev =>
                   prev.map(msg =>
@@ -178,11 +179,148 @@ export default function CompanionPage() {
     }
   };
 
+  // 语音发送
+  const handleVoiceSend = useCallback(async (blob: Blob, durationMs: number) => {
+    if (isLoading) return;
+
+    // 先上传音频获取临时URL
+    const formData = new FormData();
+    formData.append('audio', blob, 'voice.webm');
+
+    try {
+      const uploadRes = await fetch('/api/voice-upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      let voiceUrl = '';
+      if (uploadRes.ok) {
+        const uploadData = await uploadRes.json();
+        voiceUrl = uploadData.url || '';
+      }
+
+      // 同时做语音识别，拿到文字用于AI对话
+      const sttFormData = new FormData();
+      sttFormData.append('audio', blob, 'voice.webm');
+
+      let transcript = '';
+      try {
+        const sttRes = await fetch('/api/stt', {
+          method: 'POST',
+          body: sttFormData,
+        });
+        if (sttRes.ok) {
+          const sttData = await sttRes.json();
+          transcript = sttData.text || '';
+        }
+      } catch {
+        // 识别失败不影响发送
+      }
+
+      // 添加语音消息到界面
+      const voiceMessage: Message = {
+        id: generateId(),
+        role: 'user',
+        content: transcript || '(语音消息)',
+        isVoice: true,
+        voiceUrl,
+        voiceDurationMs: durationMs,
+      };
+
+      setMessages(prev => [...prev, voiceMessage]);
+
+      // 自动发送给AI（用识别出的文字）
+      if (transcript) {
+        setIsLoading(true);
+        try {
+          const response = await fetch('/api/chat/companion', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: transcript,
+              context,
+              sessionId,
+              history: messages.map(m => ({ role: m.role, content: m.content })),
+            }),
+          });
+
+          if (!response.ok) throw new Error('发送失败');
+          if (!response.body) throw new Error('响应体为空');
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let assistantMessage = '';
+          const assistantId = generateId();
+
+          setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '' }]);
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n');
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6);
+                if (data === '[DONE]') break;
+                try {
+                  const parsed = JSON.parse(data);
+                  if (parsed.error) {
+                    setMessages(prev =>
+                      prev.map(msg =>
+                        msg.id === assistantId
+                          ? { ...msg, content: `出错了: ${parsed.error}` }
+                          : msg
+                      )
+                    );
+                    break;
+                  }
+                  if (parsed.content) {
+                    assistantMessage += parsed.content;
+                    setMessages(prev =>
+                      prev.map(msg =>
+                        msg.id === assistantId
+                          ? { ...msg, content: assistantMessage }
+                          : msg
+                      )
+                    );
+                  }
+                } catch { /* ignore */ }
+              }
+            }
+          }
+        } catch (error) {
+          setMessages(prev => [
+            ...prev,
+            { id: generateId(), role: 'assistant', content: '抱歉，出了点问题，请重试' },
+          ]);
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    } catch {
+      // 上传也失败，直接用识别结果当文字消息
+    }
+  }, [isLoading, context, sessionId, messages]);
+
+  // 语音转文字回调
+  const handleVoiceTranscript = useCallback((messageId: string, text: string) => {
+    setMessages(prev =>
+      prev.map(msg =>
+        msg.id === messageId
+          ? { ...msg, voiceTranscript: text }
+          : msg
+      )
+    );
+  }, []);
+
   // 键盘发送
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      sendMessage();
+      sendMessage(input);
     }
   };
 
@@ -247,7 +385,7 @@ export default function CompanionPage() {
       {/* 消息列表 */}
       <div className="flex-1 overflow-y-auto px-4 py-4">
         <div className="max-w-2xl mx-auto space-y-4">
-          {/* AI内容标识 - 根据《人工智能生成合成内容标识办法》 */}
+          {/* AI内容标识 */}
           <div className="text-xs text-gray-400 py-2 px-3 bg-[#3A3A55]/50 rounded-lg border border-amber-900/30 mb-4">
             <div className="flex items-center gap-2 mb-1">
               <AIBadge />
@@ -273,21 +411,40 @@ export default function CompanionPage() {
                   variant="dark"
                 />
               )}
-              <div
-                className={`max-w-[80%] px-4 py-3 rounded-2xl ${
-                  msg.role === 'user'
-                    ? 'bg-[#FF6B35] text-white rounded-tr-md'
-                    : 'bg-[#2A2A45] text-gray-100 rounded-tl-md'
-                }`}
-                style={{ whiteSpace: 'pre-wrap' }}
-              >
-                {msg.role === 'assistant' && (
-                  <div className="flex items-center gap-1 mb-1">
-                    <AIBadge />
-                  </div>
-                )}
-                {msg.content}
-              </div>
+              
+              {/* 语音消息气泡 */}
+              {msg.isVoice && msg.voiceUrl ? (
+                <div className={msg.role === 'user' ? 'flex flex-col items-end gap-1' : 'flex flex-col items-start gap-1'}>
+                  <VoiceMessageBubble
+                    audioUrl={msg.voiceUrl}
+                    durationMs={msg.voiceDurationMs || 1000}
+                    isUser={msg.role === 'user'}
+                    onTranscript={msg.voiceTranscript ? undefined : (text) => handleVoiceTranscript(msg.id, text)}
+                  />
+                  {msg.voiceTranscript && (
+                    <p className="text-xs text-gray-400 max-w-[80%] px-2">
+                      {msg.voiceTranscript}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                /* 文字消息气泡 */
+                <div
+                  className={`max-w-[80%] px-4 py-3 rounded-2xl ${
+                    msg.role === 'user'
+                      ? 'bg-[#FF6B35] text-white rounded-tr-md'
+                      : 'bg-[#2A2A45] text-gray-100 rounded-tl-md'
+                  }`}
+                  style={{ whiteSpace: 'pre-wrap' }}
+                >
+                  {msg.role === 'assistant' && (
+                    <div className="flex items-center gap-1 mb-1">
+                      <AIBadge />
+                    </div>
+                  )}
+                  {msg.content}
+                </div>
+              )}
             </div>
           ))}
           
@@ -312,7 +469,7 @@ export default function CompanionPage() {
         <div className="max-w-2xl mx-auto">
           <div className="flex gap-2 items-end">
             <VoiceInput
-              onTranscript={(text) => setInput(text)}
+              onVoiceSend={handleVoiceSend}
               disabled={isLoading}
             />
             <textarea
@@ -324,7 +481,7 @@ export default function CompanionPage() {
               rows={1}
             />
             <Button
-              onClick={sendMessage}
+              onClick={() => sendMessage(input)}
               disabled={!input.trim() || isLoading}
               isLoading={isLoading}
               className="self-end"

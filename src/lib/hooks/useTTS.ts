@@ -1,9 +1,10 @@
-// TTS 语音播放 Hook - v5 边取边播
+// TTS 语音播放 Hook - v5.1 边取边播 + 并行预加载
 // 核心改进：
-// 1. 点击后1-2秒出声（只等第一段URL，不等全部）
-// 2. 播放当前段时预取下一段，无缝衔接
-// 3. 每段3次重试，减少丢句
-// 4. 播放超时60秒，防止长段被截断
+// 1. 并行预加载所有段URL（不再串行等待）
+// 2. 播放时第一段URL拿到就出声（1-2秒）
+// 3. 播放当前段时预取下一段，无缝衔接
+// 4. 每段3次重试，减少丢句
+// 5. 播放超时60秒，防止长段被截断
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 
@@ -52,22 +53,8 @@ function cleanText(text: string): string {
     .replace(/[～~]/g, '，')
     .replace(/→/g, '到')
     .replace(/—+/g, '——')
-    // 语气词
-    .replace(/哎哟[，,！!。？?～]/g, '是这样，')
-    .replace(/哎呦[，,！!。？?～]/g, '嗯，')
-    .replace(/哎呀[，,！!。？?～]/g, '嗯，')
-    .replace(/哟[，,！!。？?～]/g, '，')
-    .replace(/呵[呵哈]+[，,！!。？?]/g, '，')
-    .replace(/嘿[嘿哈]+[，,！!。？?]/g, '，')
-    .replace(/嗯嗯+/g, '嗯')
-    .replace(/哈哈+/g, '哈哈')
-    .replace(/哇[哦噢]+[，,！!。？?]/g, '，')
-    .replace(/呃[，,！!。？?]/g, '，')
-    .replace(/额[，,！!。？?]/g, '，')
-    .replace(/哦[哦噢]+[，,！!。？?]/g, '，')
-    .replace(/啊[啊哈]+[，,！!。？?]/g, '，')
-    .replace(/^嗯[，,]/, '')
-    .replace(/^哦[，,]/, '')
+    // 语气词：不再替换，让TTS原样读
+    // 之前的替换导致"哎哟"→"是这样"，读出来完全不对
     // 节奏：换行→分号
     .replace(/\n+/g, '；')
     .replace(/；{2,}/g, '；')
@@ -112,8 +99,7 @@ function splitIntoSegments(text: string): string[] {
       const code = remaining[i].codePointAt(0)!;
       charCount += ((code >= 0x4E00 && code <= 0x9FFF) || (code >= 0x3400 && code <= 0x4DBF)) ? 2 : 1;
 
-      if (charCount > MAX_COSY_CHARS - 20) { // 留20字符余量
-        // 优先在句号/问号/感叹号/分号处断开
+      if (charCount > MAX_COSY_CHARS - 20) {
         for (let j = i; j >= Math.max(0, i - 30); j--) {
           if ('。！？；'.includes(remaining[j])) {
             splitPos = j + 1;
@@ -121,7 +107,6 @@ function splitIntoSegments(text: string): string[] {
           }
         }
         if (splitPos === -1) {
-          // 其次在逗号处断开
           for (let j = i; j >= Math.max(0, i - 30); j--) {
             if ('，、：'.includes(remaining[j])) {
               splitPos = j + 1;
@@ -169,7 +154,7 @@ async function fetchSegmentUrl(
     }
 
     if (attempt < maxRetries - 1) {
-      await new Promise(r => setTimeout(r, 600 * (attempt + 1))); // 递增延迟
+      await new Promise(r => setTimeout(r, 600 * (attempt + 1)));
     }
   }
 
@@ -177,23 +162,21 @@ async function fetchSegmentUrl(
   return null;
 }
 
-// 批量预取所有段URL（用于preload，后台慢慢取）
-async function fetchAllSegmentUrls(text: string, persona: string, isCompanion: boolean): Promise<string[]> {
+// 并行预取所有段URL
+async function prefetchAllSegmentUrls(text: string, persona: string, isCompanion: boolean): Promise<string[]> {
   const clean = cleanText(text);
   if (!clean) return [];
 
   const segments = splitIntoSegments(clean);
-  console.log(`[TTS preload] ${segments.length} segments`);
+  console.log(`[TTS preload] ${segments.length} segments (parallel)`);
 
-  const urls: string[] = [];
-  for (let i = 0; i < segments.length; i++) {
-    const url = await fetchSegmentUrl(segments[i], persona, isCompanion, i);
-    urls.push(url || ''); // 保留空位保持顺序
-  }
+  // 并行请求所有段
+  const urlPromises = segments.map((seg, i) => fetchSegmentUrl(seg, persona, isCompanion, i));
+  const results = await Promise.all(urlPromises);
 
-  const valid = urls.filter(u => u).length;
-  console.log(`[TTS preload] done: ${valid}/${segments.length} OK`);
-  return urls;
+  const validCount = results.filter(u => u).length;
+  console.log(`[TTS preload] done: ${validCount}/${segments.length} OK`);
+  return results as string[];
 }
 
 export function useTTS(options: UseTTSOptions = {}) {
@@ -229,7 +212,7 @@ export function useTTS(options: UseTTSOptions = {}) {
     const pending = loadingPromises.current.get(messageId);
     if (pending) return pending;
 
-    const promise = fetchAllSegmentUrls(text, persona, isCompanion).then(urls => {
+    const promise = prefetchAllSegmentUrls(text, persona, isCompanion).then(urls => {
       loadingPromises.current.delete(messageId);
       const validUrls = urls.filter(u => u);
       if (validUrls.length > 0) urlCache.current.set(messageId, validUrls);
@@ -314,8 +297,7 @@ export function useTTS(options: UseTTSOptions = {}) {
     // 检查是否已缓存
     const cached = urlCache.current.get(messageId);
     if (cached && cached.length > 0) {
-      // 已缓存 → 直接播（秒出声）
-      console.log(`[TTS] using ${cached.length} cached URLs`);
+      console.log(`[TTS] using ${cached.length} cached URLs → instant play`);
       if (playCtx.aborted) return;
       setState({ isPlaying: true, playingId: messageId, isLoading: false, error: null });
 
@@ -357,8 +339,8 @@ export function useTTS(options: UseTTSOptions = {}) {
         continue;
       }
 
-      // 第一段就出声！
-      if (i === 0 || (i > 0 && failedCount === i)) {
+      // 第一段就出声
+      if (i === 0) {
         setState({ isPlaying: true, playingId: messageId, isLoading: false, error: null });
       }
 
