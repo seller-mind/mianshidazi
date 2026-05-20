@@ -58,7 +58,7 @@ export function ProductShowcaseSection() {
             阿搭能帮你做什么？
           </h2>
           <p className="text-lg text-[#6B7280] dark:text-gray-400">
-            不是给你答案，是帮你不再紧张
+            不只是帮你不再紧张，是陪你从害怕到上场
           </p>
         </div>
 
@@ -100,7 +100,7 @@ export function ProductShowcaseSection() {
             </Link>
             <Link href="/practice">
               <button className="px-6 py-3 bg-white dark:bg-[#252542] text-[#1F2937] dark:text-white font-medium rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-[#2A2A45] transition-colors">
-                🤖 直接开始AI面试练习
+                🎯 直接开始模拟面试
               </button>
             </Link>
           </div>
