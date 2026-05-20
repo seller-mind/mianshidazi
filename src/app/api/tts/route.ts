@@ -1,6 +1,6 @@
 // TTS API - 阿里云百炼 CosyVoice
-// 分段版：客户端已拆段，服务端只负责单段合成，不截断
-// 节奏调优：rate=0.9 对话语速 + 标点控制停顿节奏
+// 核心约束：非流式API单次限制200字符（汉字算2），超出会被截断
+// 客户端已按此限制分段，服务端只负责合成
 
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -16,27 +16,36 @@ const PERSONA_VOICE: Record<string, string> = {
 };
 const COMPANION_VOICE = 'longxiaochun_v3';
 
-// 对话节奏参数
-const COMPANION_RATE = 0.9;  // 陪伴模式：稍慢，像朋友聊天
-const INTERVIEW_RATE = 0.95; // 面试模式：正常略慢，清晰沉稳
+const COMPANION_RATE = 0.9;
+const INTERVIEW_RATE = 0.95;
 
 function cleanText(text: string): string {
   return text
+    // 去掉所有括号内容
     .replace(/[（(][^）)]*[）)]/g, '')
+    .replace(/[[\【][^】\]]*[】\]]/g, '')
+    // 去emoji
     .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
     .replace(/[\u{1F300}-\u{1F5FF}]/gu, '')
     .replace(/[\u{1F680}-\u{1F6FF}]/gu, '')
     .replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '')
     .replace(/[\u{2702}-\u{27B0}]/gu, '')
+    .replace(/[\u{2600}-\u{26FF}]/gu, '')
+    .replace(/[\u{FE00}-\u{FE0F}]/gu, '')
+    .replace(/[\u{200D}]/gu, '')
+    .replace(/✅✨👉💡🔥☕🌙😅/g, '')
+    // Markdown
     .replace(/\*{1,2}([^*]+)\*{1,2}/g, '$1')
     .replace(/#{1,6}\s/g, '')
     .replace(/[「」『』]/g, '')
     .replace(/[～~]/g, '，')
-    // 语气词自然化
-    .replace(/哎哟[，,！!。？?]/g, '是这样，')
-    .replace(/哎呦[，,！!。？?]/g, '嗯，')
-    .replace(/哎呀[，,！!。？?]/g, '嗯，')
-    .replace(/哟[，,！!。？?]/g, '，')
+    .replace(/→/g, '到')
+    .replace(/—+/g, '——')
+    // 语气词
+    .replace(/哎哟[，,！!。？?～]/g, '是这样，')
+    .replace(/哎呦[，,！!。？?～]/g, '嗯，')
+    .replace(/哎呀[，,！!。？?～]/g, '嗯，')
+    .replace(/哟[，,！!。？?～]/g, '，')
     .replace(/呵[呵哈]+[，,！!。？?]/g, '，')
     .replace(/嘿[嘿哈]+[，,！!。？?]/g, '，')
     .replace(/嗯嗯+/g, '嗯')
@@ -48,12 +57,26 @@ function cleanText(text: string): string {
     .replace(/啊[啊哈]+[，,！!。？?]/g, '，')
     .replace(/^嗯[，,]/, '')
     .replace(/^哦[，,]/, '')
-    // 节奏控制：换行→分号（≈400ms停顿，自然对话节奏），而非句号（≈600ms太长）
+    // 节奏：换行→分号
     .replace(/\n+/g, '；')
     .replace(/；{2,}/g, '；')
     .replace(/。{2,}/g, '。')
     .replace(/，{2,}/g, '，')
     .trim();
+}
+
+// 计算CosyVoice字符数
+function cosyVoiceLen(text: string): number {
+  let len = 0;
+  for (const ch of text) {
+    const code = ch.codePointAt(0)!;
+    if ((code >= 0x4E00 && code <= 0x9FFF) || (code >= 0x3400 && code <= 0x4DBF) || (code >= 0xF900 && code <= 0xFAFF)) {
+      len += 2;
+    } else {
+      len += 1;
+    }
+  }
+  return len;
 }
 
 export async function GET(request: NextRequest) {
@@ -71,6 +94,27 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: '没有可朗读的内容' }, { status: 400 });
   }
 
+  // 安全检查：超过200字符截断到安全位置
+  let safeText = text;
+  if (cosyVoiceLen(text) > 195) {
+    console.warn(`[TTS API] text too long (${cosyVoiceLen(text)} chars), truncating`);
+    let cutPos = 0;
+    let count = 0;
+    for (let i = 0; i < text.length; i++) {
+      const code = text[i].codePointAt(0)!;
+      count += ((code >= 0x4E00 && code <= 0x9FFF) || (code >= 0x3400 && code <= 0x4DBF)) ? 2 : 1;
+      if (count > 180) { cutPos = i; break; }
+    }
+    // 往前找标点
+    for (let i = cutPos; i >= Math.max(0, cutPos - 20); i--) {
+      if ('。！？；，'.includes(text[i])) {
+        safeText = text.substring(0, i + 1);
+        break;
+      }
+    }
+    if (safeText === text) safeText = text.substring(0, cutPos);
+  }
+
   const voice = isCompanion ? COMPANION_VOICE : (PERSONA_VOICE[persona] || PERSONA_VOICE['A']);
   const rate = isCompanion ? COMPANION_RATE : INTERVIEW_RATE;
 
@@ -86,7 +130,7 @@ export async function GET(request: NextRequest) {
       },
       body: JSON.stringify({
         model: 'cosyvoice-v3-flash',
-        input: { text, voice, format: 'mp3', sample_rate: 22050, rate },
+        input: { text: safeText, voice, format: 'mp3', sample_rate: 22050, rate },
       }),
       signal: controller.signal,
     });
@@ -94,6 +138,8 @@ export async function GET(request: NextRequest) {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      const errText = await response.text();
+      console.error('[TTS API] synthesis failed:', response.status, errText);
       return NextResponse.json({ error: '语音合成失败' }, { status: 500 });
     }
 
@@ -101,6 +147,7 @@ export async function GET(request: NextRequest) {
     const audioUrl = data?.output?.audio?.url;
 
     if (!audioUrl) {
+      console.error('[TTS API] no audio url:', JSON.stringify(data));
       return NextResponse.json({ error: '语音合成异常' }, { status: 500 });
     }
 
