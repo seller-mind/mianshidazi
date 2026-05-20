@@ -64,7 +64,7 @@ function PracticeContent() {
     let intro = '';
     switch (selectedPersona) {
       case 'A':
-        intro = '你好呀，今天来做一次轻松的面试练习。别紧张，就当和朋友聊天。准备好了吗？';
+        intro = '你好呀，今天来做一次轻松的面试练习。准备好了吗？';
         break;
       case 'B':
         intro = '你好，请坐。从自我介绍开始吧，1-2分钟。';
