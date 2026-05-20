@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui';
+import { LoginModal } from '@/components/LoginModal';
 
 // V10 定价方案 - 紧张诊断和阿搭聊天免费，模拟面试收费
 const PRICING_PLANS = [
@@ -56,6 +58,50 @@ const PRICING_PLANS = [
 ];
 
 export function PricingSection() {
+  const [showLogin, setShowLogin] = useState(false);
+  const [payingPlan, setPayingPlan] = useState<string | null>(null);
+  const [payLoading, setPayLoading] = useState(false);
+
+  const handleBuy = async (planId: string) => {
+    setPayLoading(true);
+    setPayingPlan(planId);
+    try {
+      // 先检查是否登录
+      const meRes = await fetch('/api/auth/me');
+      if (!meRes.ok) {
+        setShowLogin(true);
+        setPayLoading(false);
+        return;
+      }
+
+      // 创建支付订单
+      const payRes = await fetch('/api/payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planId }),
+      });
+      const payData = await payRes.json();
+
+      if (payData.error) {
+        if (payData.error.includes('登录')) {
+          setShowLogin(true);
+        } else {
+          alert(payData.error);
+        }
+        return;
+      }
+
+      if (payData.paymentUrl) {
+        window.location.href = payData.paymentUrl;
+      }
+    } catch {
+      alert('网络错误，请重试');
+    } finally {
+      setPayLoading(false);
+      setPayingPlan(null);
+    }
+  };
+
   return (
     <section className="py-10 md:py-20 px-4 md:px-6 bg-gradient-to-b from-white to-orange-50 dark:from-[#1A1A2E] dark:to-[#252542]">
       <div className="max-w-4xl mx-auto">
@@ -137,8 +183,10 @@ export function PricingSection() {
               <Button
                 variant={plan.popular ? 'primary' : 'outline'}
                 className="w-full text-sm md:text-base"
+                onClick={() => handleBuy(plan.id)}
+                disabled={payLoading && payingPlan === plan.id}
               >
-                {plan.cta}
+                {payLoading && payingPlan === plan.id ? '跳转中...' : plan.cta}
               </Button>
             </div>
           ))}
@@ -166,6 +214,9 @@ export function PricingSection() {
           </div>
         </div>
       </div>
+
+      {/* 登录弹窗 */}
+      <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
     </section>
   );
 }
