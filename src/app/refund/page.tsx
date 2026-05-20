@@ -113,7 +113,7 @@ export default function RefundPage() {
         </p>
         <ul className="mt-2 text-sm">
           <li>• 在购买前充分了解服务内容</li>
-          <li>• 先体验免费功能（如紧张类型诊断）</li>
+          <li>• 先体验免费功能（如紧张类型测试）</li>
           <li>• 如有疑问，联系客服咨询后再购买</li>
         </ul>
       </div>

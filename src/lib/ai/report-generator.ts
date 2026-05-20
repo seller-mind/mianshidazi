@@ -252,7 +252,7 @@ export function formatReportAsText(report: InterviewReport): string {
 - 真实水平：${report.scores?.realLevel ?? 0}
 - 紧张偷走的分数：${report.scores?.tensionLost ?? 0}
 
-## 紧张类型诊断
+## 紧张类型测试
 - 类型：${report.tensionDiagnosis?.typeName ?? '未知'}
 - 紧张指数：${report.tensionDiagnosis?.tensionIndex ?? 0}
 - 描述：${report.tensionDiagnosis?.description ?? ''}

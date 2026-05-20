@@ -3,7 +3,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: '面试搭子 - AI面试紧张终结者 | mianshidazi.com',
-  description: '你不是不会，你只是太紧张了。找个面试搭子，上场不慌。AI面试紧张类型诊断 + 模拟面试练习，帮助你克服面试恐惧，提升面试表现。',
+  description: '你不是不会，你只是太紧张了。找个面试搭子，上场不慌。AI面试紧张类型测试 + 模拟面试练习，帮助你克服面试恐惧，提升面试表现。',
   keywords: '面试紧张, 面试焦虑, AI面试练习, 面试辅导, 克服面试恐惧, 面试搭子',
   authors: [{ name: '面试搭子' }],
   openGraph: {

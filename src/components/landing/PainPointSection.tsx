@@ -20,7 +20,7 @@ export function PainPointSection() {
       quote: '"追问不是在审判你，是在确认你真的做过。愣几秒是正常的，面试官不会因为你在思考而觉得你不行。"',
     },
     {
-      title: '等通知等焦虑',
+      title: '等通知焦虑',
       description: '每天刷八百遍邮箱/招聘APP，一有消息就心跳加速',
       emoji: '😰',
       color: 'from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20',
@@ -76,7 +76,7 @@ export function PainPointSection() {
           ))}
         </div>
 
-        {/* V9 新增：紧张类型诊断入口 */}
+        {/* V9 新增：紧张类型测试入口 */}
         <div className="mt-12 bg-gradient-to-r from-[#FF6B35]/10 to-[#E55A28]/10 dark:from-[#FF6B35]/5 dark:to-[#E55A28]/5 rounded-2xl p-8 text-center">
           <h3 className="text-xl font-semibold text-[#1F2937] dark:text-white mb-3">
             🔍 找到你紧张的根本原因
@@ -86,7 +86,7 @@ export function PainPointSection() {
           </p>
           <Link href="/diagnose">
             <button className="px-6 py-3 bg-[#FF6B35] text-white font-medium rounded-xl hover:bg-[#E55A28] transition-colors">
-              免费做紧张类型诊断 →
+              免费做紧张类型测试 →
             </button>
           </Link>
         </div>

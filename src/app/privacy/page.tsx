@@ -19,7 +19,7 @@ export default function PrivacyPage() {
       <ul>
         <li><strong>账户信息</strong>：微信昵称、头像（通过微信授权获取）</li>
         <li><strong>联系方式</strong>：手机号码（用于账号登录和重要通知）</li>
-        <li><strong>使用数据</strong>：您进行的面试练习记录、紧张类型诊断结果、对话内容</li>
+        <li><strong>使用数据</strong>：您进行的面试练习记录、紧张类型测试结果、对话内容</li>
         <li><strong>设备信息</strong>：设备型号、操作系统版本，用于优化服务体验</li>
         <li><strong>支付信息</strong>：通过虎皮椒支付系统处理的交易信息（我们不存储完整银行卡信息）</li>
       </ul>

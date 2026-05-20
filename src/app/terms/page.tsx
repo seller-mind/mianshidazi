@@ -17,7 +17,7 @@ export default function TermsPage() {
       <h3>1.1 服务内容</h3>
       <p>面试搭子（mianshidazi.com）为您提供以下服务：</p>
       <ul>
-        <li>AI面试紧张类型诊断</li>
+        <li>AI面试紧张类型测试</li>
         <li>AI模拟面试练习</li>
         <li>AI面试官对话模拟</li>
         <li>面试紧张心理陪伴和建议</li>

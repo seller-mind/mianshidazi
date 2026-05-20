@@ -16,7 +16,7 @@ const PRICING_PLANS = [
       '面试练习报告',
       '1种面试官人格',
     ],
-    freeNote: '紧张类型诊断 · 阿搭聊天 · 永久免费',
+    freeNote: '紧张类型测试 · 阿搭聊天 · 永久免费',
     cta: '开始模拟面试',
     popular: false,
   },
@@ -33,7 +33,7 @@ const PRICING_PLANS = [
       '5种面试官人格',
       '紧张缓解训练',
     ],
-    freeNote: '紧张类型诊断 · 阿搭聊天 · 永久免费',
+    freeNote: '紧张类型测试 · 阿搭聊天 · 永久免费',
     cta: '开通月卡',
     popular: true,
   },
@@ -50,7 +50,7 @@ const PRICING_PLANS = [
       '面试复盘指导',
       '专属紧张缓解方案',
     ],
-    freeNote: '紧张类型诊断 · 阿搭聊天 · 永久免费',
+    freeNote: '紧张类型测试 · 阿搭聊天 · 永久免费',
     cta: '开通季卡',
     popular: false,
   },
@@ -66,7 +66,7 @@ export function PricingSection() {
             模拟面试，收费；其他的，免费
           </h2>
           <p className="text-lg text-[#6B7280] dark:text-gray-400">
-            紧张类型诊断和阿搭聊天永久免费，只有模拟面试收费
+            紧张类型测试和阿搭聊天永久免费，只有模拟面试收费
           </p>
         </div>
 
@@ -77,7 +77,7 @@ export function PricingSection() {
             <div>
               <p className="font-medium text-green-700 dark:text-green-400 mb-2">永久免费</p>
               <p className="text-sm text-green-600 dark:text-green-300 leading-relaxed">
-                紧张类型诊断 — 5种紧张类型，精准定位你的问题根源
+                紧张类型测试 — 5种紧张类型，精准定位你的问题根源
               </p>
               <p className="text-sm text-green-600 dark:text-green-300 leading-relaxed mt-1">
                 阿搭聊天 — 面试前紧张、面试后崩溃、等通知焦虑，随时找阿搭聊

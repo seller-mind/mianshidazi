@@ -7,7 +7,7 @@ export function ProductShowcaseSection() {
   const features = [
     {
       emoji: '🔬',
-      title: '紧张类型诊断',
+      title: '紧张类型测试',
       description: '5种紧张类型，精准定位你的问题根源。不是泛泛的"放松点"，是针对性的解决方案。',
       color: 'from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20',
       tag: '灵魂功能',
@@ -95,7 +95,7 @@ export function ProductShowcaseSection() {
           <div className="flex flex-wrap justify-center gap-4">
             <Link href="/diagnose">
               <button className="px-6 py-3 bg-[#FF6B35] text-white font-medium rounded-xl hover:bg-[#E55A28] transition-colors">
-                🔍 先做紧张类型诊断
+                🔍 先做紧张类型测试
               </button>
             </Link>
             <Link href="/practice">

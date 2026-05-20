@@ -136,7 +136,7 @@ export default function DashboardPage() {
             <Link href="/diagnose">
               <Button variant="outline" className="w-full h-full py-4">
                 <div className="text-center">
-                  <p className="text-lg mb-1">紧张类型诊断</p>
+                  <p className="text-lg mb-1">紧张类型测试</p>
                   <p className="text-xs text-gray-500">约3分钟</p>
                 </div>
               </Button>

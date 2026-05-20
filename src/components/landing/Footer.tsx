@@ -18,7 +18,7 @@ export default function Footer({ showNavigation = true }: FooterProps) {
           
           {showNavigation && (
             <div className="flex gap-6 text-sm flex-wrap justify-center">
-              <Link href="/diagnose" className="hover:text-white transition-colors">紧张类型诊断</Link>
+              <Link href="/diagnose" className="hover:text-white transition-colors">紧张类型测试</Link>
               <Link href="/practice" className="hover:text-white transition-colors">模拟面试</Link>
               <Link href="/companion" className="hover:text-white transition-colors">阿搭聊天</Link>
               <Link href="/report" className="hover:text-white transition-colors">面试报告</Link>
