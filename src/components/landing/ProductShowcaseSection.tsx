@@ -87,20 +87,28 @@ export function ProductShowcaseSection() {
           ))}
         </div>
 
-        {/* 练习入口 */}
-        <div className="mt-8 md:mt-12 text-center">
-          <p className="text-sm md:text-base text-[#6B7280] dark:text-gray-400 mb-4">
-            准备好开始练习了吗？
+        {/* 开启旅程 */}
+        <div className="mt-8 md:mt-12 bg-gradient-to-br from-[#FF6B35]/5 to-[#E55A28]/5 dark:from-[#FF6B35]/5 dark:to-[#E55A28]/5 rounded-2xl p-6 md:p-8 text-center border border-[#FF6B35]/10">
+          <h3 className="text-lg md:text-2xl font-bold text-[#1F2937] dark:text-white mb-2">
+            开启你的模拟面试之旅
+          </h3>
+          <p className="text-xs md:text-sm text-[#6B7280] dark:text-gray-400 mb-5 max-w-md mx-auto">
+            先测紧张类型，再和阿搭聊聊，准备好了就上模拟面试——每一步都有阿搭陪你
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-3 md:gap-4">
             <Link href="/diagnose">
-              <button className="px-5 py-2.5 md:px-6 md:py-3 bg-[#FF6B35] text-white text-sm md:text-base font-medium rounded-xl hover:bg-[#E55A28] transition-colors">
-                🔍 先做紧张类型测试
+              <button className="px-5 py-2.5 md:px-6 md:py-3 bg-[#FF6B35] text-white text-sm md:text-base font-medium rounded-xl hover:bg-[#E55A28] transition-colors shadow-md shadow-[#FF6B35]/20">
+                🔍 紧张类型测试
+              </button>
+            </Link>
+            <Link href="/companion">
+              <button className="px-5 py-2.5 md:px-6 md:py-3 bg-white dark:bg-[#252542] text-[#1F2937] dark:text-white text-sm md:text-base font-medium rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-[#2A2A45] transition-colors">
+                💬 先和阿搭聊聊
               </button>
             </Link>
             <Link href="/practice">
               <button className="px-5 py-2.5 md:px-6 md:py-3 bg-white dark:bg-[#252542] text-[#1F2937] dark:text-white text-sm md:text-base font-medium rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-[#2A2A45] transition-colors">
-                🎯 直接开始模拟面试
+                🎯 模拟面试
               </button>
             </Link>
           </div>
