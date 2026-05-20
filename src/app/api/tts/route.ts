@@ -1,6 +1,5 @@
 // TTS API - 阿里云百炼 CosyVoice
-// 只返回音频URL，不下载音频（省3-5秒，避免Vercel超时）
-// 客户端Audio直接播放OSS URL
+// 分段版：客户端已拆段，服务端只负责单段合成，不截断
 
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -28,27 +27,26 @@ function cleanText(text: string): string {
     .replace(/#{1,6}\s/g, '')
     .replace(/[「」『』]/g, '')
     .replace(/[～~]/g, '，')
-    .replace(/哎哟[，,！!。]/g, '嗯，')
-    .replace(/哎呦[，,！!。]/g, '嗯，')
-    .replace(/哟[，,！!。]/g, '，')
+    // 语气词自然化：TTS对纯语气词发音别扭，替换为自然短句
+    .replace(/哎哟[，,！!。？?]/g, '是这样，')
+    .replace(/哎呦[，,！!。？?]/g, '嗯，')
+    .replace(/哎呀[，,！!。？?]/g, '嗯，')
+    .replace(/哟[，,！!。？?]/g, '，')
+    .replace(/呵[呵哈]+[，,！!。？?]/g, '，')
+    .replace(/嘿[嘿哈]+[，,！!。？?]/g, '，')
     .replace(/嗯嗯+/g, '嗯')
     .replace(/哈哈+/g, '哈哈')
+    .replace(/哇[哦噢]+[，,！!。？?]/g, '，')
+    .replace(/呃[，,！!。？?]/g, '，')
+    .replace(/额[，,！!。？?]/g, '，')
+    .replace(/哦[哦噢]+[，,！!。？?]/g, '，')
+    .replace(/啊[啊哈]+[，,！!。？?]/g, '，')
+    .replace(/^嗯[，,]/, '')
+    .replace(/^哦[，,]/, '')
     .replace(/\n+/g, '。')
     .replace(/。{2,}/g, '。')
     .replace(/，{2,}/g, '，')
     .trim();
-}
-
-function truncateText(text: string, maxLen = 200): string {
-  if (text.length <= maxLen) return text;
-  const truncated = text.substring(0, maxLen);
-  const lastPunc = Math.max(
-    truncated.lastIndexOf('。'), truncated.lastIndexOf('，'),
-    truncated.lastIndexOf('！'), truncated.lastIndexOf('？'),
-    truncated.lastIndexOf('；')
-  );
-  if (lastPunc > maxLen * 0.4) return text.substring(0, lastPunc + 1);
-  return truncated + '…';
 }
 
 export async function GET(request: NextRequest) {
@@ -61,7 +59,8 @@ export async function GET(request: NextRequest) {
   const persona = searchParams.get('persona') || 'A';
   const isCompanion = searchParams.get('isCompanion') === 'true';
 
-  const text = truncateText(cleanText(rawText), 200);
+  // 客户端已经拆成100字小段，服务端不再截断
+  const text = cleanText(rawText);
   if (!text) {
     return NextResponse.json({ error: '没有可朗读的内容' }, { status: 400 });
   }
@@ -98,7 +97,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '语音合成异常' }, { status: 500 });
     }
 
-    // 只返回URL，不下载音频（省3-5秒，避免超时）
+    // 只返回URL，不下载音频
     return NextResponse.json({ url: audioUrl.replace(/^http:/, 'https:') });
 
   } catch (err: unknown) {

@@ -56,15 +56,15 @@ export default function CompanionPage() {
     
     const welcomeMessages: Message[] = [
       {
-        id: generateId(),
+        id: 'welcome-1',
         role: 'assistant',
-        content: '嗨，你来啦 👋\n\n我是阿搭，你的面试搭子。\n\n不管是面试前紧张、面试后崩溃、还是等通知等焦虑，都可以跟我说。\n\n我在这里。',
+        content: '嗨，你来啦。我是阿搭，你的面试搭子。不管是面试前紧张、面试后崩溃、还是等通知等焦虑，都可以跟我说。我在这里。',
       },
     ];
 
     if (welcomeContext === '深夜') {
       welcomeMessages.push({
-        id: generateId(),
+        id: 'welcome-2',
         role: 'assistant',
         content: '这么晚还没睡？明天有面试吗？',
       });

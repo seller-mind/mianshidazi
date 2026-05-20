@@ -1,42 +1,61 @@
 // STT API - 语音转文字
-// 方案：客户端录音上传 → 服务端先上传到DashScope获取临时URL → 调Paraformer识别
-// DashScope提供文件上传凭证接口，可以上传本地文件获取临时URL
+// 方案：客户端录音上传 → 服务端上传到DashScope临时存储 → Paraformer识别
+// 参考文档：https://help.aliyun.com/zh/model-studio/get-temporary-file-url
 
 import { NextRequest, NextResponse } from 'next/server';
 
 const DASHSCOPE_API_KEY = process.env.DASHSCOPE_API_KEY;
 
-// 第一步：获取上传凭证
-async function getUploadPolicy(filename: string): Promise<{ url: string; policy: string; signature: string; ossAccessKeyId: string; key: string }> {
-  const res = await fetch('https://dashscope.aliyuncs.com/api/v1/uploads', {
-    method: 'POST',
+// 第一步：获取上传凭证（GET请求）
+async function getUploadPolicy(): Promise<{
+  upload_host: string;
+  upload_dir: string;
+  oss_access_key_id: string;
+  policy: string;
+  signature: string;
+}> {
+  const url = 'https://dashscope.aliyuncs.com/api/v1/uploads?action=getPolicy&model=paraformer-v2';
+  const res = await fetch(url, {
+    method: 'GET',
     headers: {
       'Authorization': `Bearer ${DASHSCOPE_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ action: 'getPolicy', file_name: filename }),
   });
 
   if (!res.ok) {
+    const errText = await res.text();
+    console.error('getUploadPolicy failed:', res.status, errText);
     throw new Error('获取上传凭证失败');
   }
 
   const data = await res.json();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (data as any).data;
+  return data.data;
 }
 
 // 第二步：上传文件到OSS
-async function uploadToOss(policy: Record<string, string>, fileData: ArrayBuffer, filename: string): Promise<void> {
+async function uploadToOss(
+  policy: { upload_host: string; upload_dir: string; oss_access_key_id: string; policy: string; signature: string },
+  fileData: ArrayBuffer,
+  filename: string
+): Promise<string> {
+  const key = policy.upload_dir + '/' + filename;
+
   const formData = new FormData();
-  formData.append('key', policy.key || filename);
+  formData.append('OSSAccessKeyId', policy.oss_access_key_id);
   formData.append('policy', policy.policy);
   formData.append('Signature', policy.signature);
-  formData.append('OSSAccessKeyId', policy.ossAccessKeyId || '');
+  formData.append('key', key);
   formData.append('file', new Blob([fileData]), filename);
 
-  const res = await fetch(policy.url, { method: 'POST', body: formData });
-  if (!res.ok) throw new Error('上传文件失败');
+  const res = await fetch(policy.upload_host, { method: 'POST', body: formData });
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error('uploadToOss failed:', res.status, errText);
+    throw new Error('上传文件失败');
+  }
+
+  return key;
 }
 
 // 第三步：提交识别任务
@@ -55,13 +74,24 @@ async function submitAsrTask(fileUrl: string): Promise<string> {
     }),
   });
 
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error('submitAsrTask failed:', res.status, errText);
+    throw new Error('提交识别任务失败');
+  }
+
   const data = await res.json();
-  return data.output.task_id;
+  const taskId = data.output?.task_id;
+  if (!taskId) {
+    console.error('submitAsrTask no task_id:', JSON.stringify(data));
+    throw new Error('提交识别任务异常');
+  }
+  return taskId;
 }
 
 // 第四步：查询识别结果
 async function queryAsrResult(taskId: string): Promise<string> {
-  for (let i = 0; i < 30; i++) { // 最多等10秒
+  for (let i = 0; i < 40; i++) {
     const res = await fetch(`https://dashscope.aliyuncs.com/api/v1/tasks/${taskId}`, {
       method: 'GET',
       headers: { 'Authorization': `Bearer ${DASHSCOPE_API_KEY}` },
@@ -71,7 +101,6 @@ async function queryAsrResult(taskId: string): Promise<string> {
     const status = data.output?.task_status;
 
     if (status === 'SUCCEEDED') {
-      // 获取识别结果
       const results = data.output.results;
       if (results && results.length > 0 && results[0].transcription_url) {
         const transRes = await fetch(results[0].transcription_url);
@@ -83,10 +112,11 @@ async function queryAsrResult(taskId: string): Promise<string> {
     }
 
     if (status === 'FAILED') {
+      console.error('ASR task failed:', JSON.stringify(data.output));
       throw new Error('识别失败');
     }
 
-    // 等待200ms重试
+    // 等待300ms重试
     await new Promise(resolve => setTimeout(resolve, 300));
   }
 
@@ -111,14 +141,13 @@ export async function POST(request: NextRequest) {
     const filename = `voice_${Date.now()}.webm`;
 
     // 1. 获取上传凭证
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const policy = await getUploadPolicy(filename) as any;
+    const policy = await getUploadPolicy();
 
     // 2. 上传到OSS
-    await uploadToOss(policy, audioData, filename);
+    const ossKey = await uploadToOss(policy, audioData, filename);
 
-    // 3. 构建文件URL
-    const fileUrl = policy.key ? `oss://${policy.key}` : `oss://${filename}`;
+    // 3. 用 oss:// 前缀的临时URL
+    const fileUrl = `oss://${ossKey}`;
 
     // 4. 提交识别任务
     const taskId = await submitAsrTask(fileUrl);
