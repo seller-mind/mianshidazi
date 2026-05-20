@@ -5,7 +5,7 @@ import { Button } from '@/components/ui';
 
 export function HeroSection() {
   return (
-    <section className="min-h-screen flex flex-col items-center justify-center px-4 py-12 md:px-6 md:py-20 bg-gradient-to-b from-white to-orange-50 dark:from-[#1A1A2E] dark:to-[#252542] relative">
+    <section className="min-h-screen flex flex-col items-center justify-center px-4 pt-24 pb-12 md:pt-20 md:pb-20 bg-gradient-to-b from-white to-orange-50 dark:from-[#1A1A2E] dark:to-[#252542] relative">
       {/* 装饰背景 */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-10 left-4 w-40 h-40 md:w-64 md:h-64 bg-[#FF6B35]/5 rounded-full blur-3xl" />
