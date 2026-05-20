@@ -44,14 +44,15 @@ function PracticeContent() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // 预加载语音：所有AI消息立即预加载
+  // 预加载语音：仅在AI回复完成后预加载（避免SSE流式内容被截断缓存）
   useEffect(() => {
+    if (isLoading) return; // AI还在回复时不预加载
     messages.forEach(msg => {
       if (msg.role === 'assistant' && msg.content) {
         preload(msg.content, msg.id);
       }
     });
-  }, [messages, preload]);
+  }, [messages, preload, isLoading]);
 
   // 开始面试
   const startInterview = () => {

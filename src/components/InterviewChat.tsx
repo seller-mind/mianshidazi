@@ -25,18 +25,22 @@ export default function InterviewChat({ sessionId, persona, interviewType = '通
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // TTS 语音播放
-  const { play, stop, preload, isPreloaded, isPreloading, isPlayingMessage, isLoadingMessage, error: ttsError } = useTTS({ persona });
+  const { play, stop, preload, isPlayingMessage, isLoadingMessage } = useTTS({ persona });
 
-  // 自动滚动到底部 + 预加载新消息的语音
+  // 自动滚动到底部
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    // AI 新消息出现时自动预加载语音
+  }, [messages]);
+
+  // 仅在AI回复完成后预加载语音（避免SSE流式内容被截断缓存）
+  useEffect(() => {
+    if (isLoading) return;
     messages.forEach(msg => {
       if (msg.role === 'assistant' && msg.content) {
         preload(msg.content, msg.id);
       }
     });
-  }, [messages, preload]);
+  }, [messages, preload, isLoading]);
 
   // 发送消息
   const sendMessage = async () => {
