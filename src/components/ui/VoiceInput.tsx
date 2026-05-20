@@ -7,28 +7,86 @@ interface VoiceInputProps {
   disabled?: boolean;
 }
 
-type VoiceState = 'idle' | 'recording' | 'uploading' | 'error';
+type VoiceState = 'idle' | 'recording' | 'recognizing' | 'error';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SpeechRecognitionCtor = any;
+
+// 检测浏览器原生语音识别支持
+function getSpeechRecognition(): SpeechRecognitionCtor | null {
+  if (typeof window === 'undefined') return null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const w = window as any;
+  return w.SpeechRecognition || w.webkitSpeechRecognition || null;
+}
+
+// 检测MediaRecorder支持
+function canMediaRecord(): boolean {
+  return typeof navigator !== 'undefined' &&
+    typeof navigator.mediaDevices !== 'undefined' &&
+    typeof navigator.mediaDevices.getUserMedia === 'function' &&
+    typeof MediaRecorder !== 'undefined';
+}
 
 export function VoiceInput({ onTranscript, disabled }: VoiceInputProps) {
   const [state, setState] = useState<VoiceState>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const recognitionRef = useRef<InstanceType<ReturnType<typeof getSpeechRecognition>> | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const [canRecord, setCanRecord] = useState<boolean | null>(null);
 
-  useEffect(() => {
-    // 检测是否支持录音
-    const supported = typeof navigator !== 'undefined' &&
-      typeof navigator.mediaDevices !== 'undefined' &&
-      typeof navigator.mediaDevices.getUserMedia === 'function' &&
-      typeof MediaRecorder !== 'undefined';
-    setCanRecord(supported);
-  }, []);
+  // 方案1：浏览器原生SpeechRecognition（首选）
+  const startNativeRecognition = useCallback(() => {
+    const SpeechRecognition = getSpeechRecognition();
+    if (!SpeechRecognition) return false;
 
-  const startRecording = useCallback(async () => {
-    if (!canRecord) {
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'zh-CN';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      setState('recording');
+    };
+
+    recognition.onresult = (event: { results: { transcript: string }[][] }) => {
+      const transcript = event.results[0][0].transcript;
+      if (transcript) {
+        onTranscript(transcript);
+      }
+      setState('idle');
+    };
+
+    recognition.onerror = (event: { error: string }) => {
+      console.warn('[VoiceInput] native recognition error:', event.error);
+      if (event.error === 'not-allowed') {
+        setState('error');
+        setErrorMsg('请允许麦克风权限');
+        setTimeout(() => setState('idle'), 2000);
+      } else if (event.error === 'no-speech') {
+        setState('idle');
+      } else {
+        // 原生识别失败，降级到录音上传
+        console.log('[VoiceInput] native failed, falling back to recording upload');
+        startRecordingUpload();
+      }
+    };
+
+    recognition.onend = () => {
+      if (state === 'recording') setState('idle');
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    return true;
+  }, [onTranscript, state]);
+
+  // 方案2：录音上传Whisper API（降级）
+  const startRecordingUpload = useCallback(async () => {
+    if (!canMediaRecord()) {
       setState('error');
-      setErrorMsg('请用浏览器打开 mianshidazi.com 使用语音输入');
+      setErrorMsg('请用浏览器打开使用语音');
       setTimeout(() => setState('idle'), 3000);
       return;
     }
@@ -57,7 +115,7 @@ export function VoiceInput({ onTranscript, disabled }: VoiceInputProps) {
           return;
         }
 
-        setState('uploading');
+        setState('recognizing');
 
         try {
           const formData = new FormData();
@@ -73,7 +131,7 @@ export function VoiceInput({ onTranscript, disabled }: VoiceInputProps) {
             onTranscript(data.text);
           } else {
             setState('error');
-            setErrorMsg(data.error || '识别失败，请重试');
+            setErrorMsg(data.error || '识别失败');
             setTimeout(() => setState('idle'), 2000);
             return;
           }
@@ -95,46 +153,59 @@ export function VoiceInput({ onTranscript, disabled }: VoiceInputProps) {
       setErrorMsg('请允许麦克风权限');
       setTimeout(() => setState('idle'), 3000);
     }
-  }, [canRecord, onTranscript]);
+  }, [onTranscript]);
 
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && state === 'recording') {
+  const start = useCallback(() => {
+    // 优先用浏览器原生识别
+    const nativeStarted = startNativeRecognition();
+    if (!nativeStarted) {
+      // 不支持原生，用录音上传
+      startRecordingUpload();
+    }
+  }, [startNativeRecognition, startRecordingUpload]);
+
+  const stop = useCallback(() => {
+    // 停止原生识别
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    // 停止录音
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
     }
-  }, [state]);
+  }, []);
 
   const toggle = useCallback(() => {
     if (state === 'recording') {
-      stopRecording();
+      stop();
     } else if (state === 'idle') {
-      startRecording();
+      start();
     }
-  }, [state, startRecording, stopRecording]);
-
-  if (canRecord === null) return null;
+  }, [state, start, stop]);
 
   return (
     <div className="relative flex-shrink-0">
       <button
         type="button"
         onClick={toggle}
-        disabled={disabled || state === 'uploading'}
+        disabled={disabled || state === 'recognizing'}
         className={`flex items-center justify-center w-10 h-10 rounded-full transition-all ${
           state === 'recording'
             ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30'
-            : state === 'uploading'
+            : state === 'recognizing'
             ? 'bg-orange-400 text-white'
             : state === 'error'
             ? 'bg-red-100 text-red-500'
             : 'bg-gray-100 text-gray-500 hover:bg-gray-200 active:bg-gray-300'
         } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
         title={
-          state === 'recording' ? '点击停止录音'
-          : state === 'uploading' ? '识别中...'
+          state === 'recording' ? '点击停止'
+          : state === 'recognizing' ? '识别中...'
           : '语音输入'
         }
       >
-        {state === 'uploading' ? (
+        {state === 'recognizing' ? (
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
             <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4" />
           </svg>
@@ -147,13 +218,12 @@ export function VoiceInput({ onTranscript, disabled }: VoiceInputProps) {
           </svg>
         )}
       </button>
-      {/* 状态提示 */}
       {state === 'recording' && (
         <div className="absolute bottom-12 left-1/2 -translate-x-1/2 whitespace-nowrap bg-red-500 text-white text-xs px-3 py-2 rounded-lg shadow-lg z-50">
           正在录音，点击停止...
         </div>
       )}
-      {state === 'uploading' && (
+      {state === 'recognizing' && (
         <div className="absolute bottom-12 left-1/2 -translate-x-1/2 whitespace-nowrap bg-orange-500 text-white text-xs px-3 py-2 rounded-lg shadow-lg z-50">
           识别中...
         </div>
