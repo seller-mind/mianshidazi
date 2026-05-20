@@ -3,21 +3,20 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui';
 
-// V9 定价方案
+// V10 定价方案 - 紧张诊断和阿搭聊天免费，模拟面试收费
 const PRICING_PLANS = [
   {
     id: 'single',
-    name: '单次体验',
+    name: '单次模拟面试',
     price: 9.9,
     priceLabel: '¥9.9',
-    description: '试试水',
+    description: '先试一次',
     features: [
-      '1次AI模拟面试',
-      '个性化面试报告',
-      '紧张类型诊断',
-      '24小时有效期',
+      '1次模拟面试',
+      '面试练习报告',
     ],
-    cta: '立即体验',
+    freeNote: '紧张类型诊断 · 阿搭聊天 · 永久免费',
+    cta: '开始模拟面试',
     popular: false,
   },
   {
@@ -26,15 +25,13 @@ const PRICING_PLANS = [
     price: 49,
     priceLabel: '¥49/月',
     originalPrice: 99,
-    description: '一顿火锅的价格',
+    description: '约等于5杯奶茶',
     features: [
-      '无限次AI模拟面试',
-      '个性化面试报告',
-      '紧张类型诊断',
+      '无限次模拟面试',
+      '面试练习报告',
       '5种面试官人格',
-      '阿搭陪伴聊天',
-      '优先客服支持',
     ],
+    freeNote: '紧张类型诊断 · 阿搭聊天 · 永久免费',
     cta: '开通月卡',
     popular: true,
   },
@@ -44,14 +41,13 @@ const PRICING_PLANS = [
     price: 119,
     priceLabel: '¥119/季',
     originalPrice: 279,
-    description: '两顿火锅的价格',
+    description: '约等于2杯奶茶/月',
     features: [
       '月卡全部权益',
       '面试复盘指导',
       '专属紧张缓解训练',
-      '历史报告回顾',
-      '一对一咨询1次',
     ],
+    freeNote: '紧张类型诊断 · 阿搭聊天 · 永久免费',
     cta: '开通季卡',
     popular: false,
   },
@@ -64,18 +60,27 @@ export function PricingSection() {
         {/* 标题 */}
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-[#1F2937] dark:text-white mb-4">
-            开始你的第一次练习
+            模拟面试，收费；其他的，免费
           </h2>
           <p className="text-lg text-[#6B7280] dark:text-gray-400">
-            给自己一个不再害怕面试的机会
+            紧张类型诊断和阿搭聊天永久免费，只有模拟面试收费
           </p>
         </div>
 
-        {/* V9 初心定价话术 */}
-        <div className="bg-gradient-to-r from-[#FF6B35]/5 to-[#E55A28]/5 dark:from-[#FF6B35]/10 dark:to-[#E55A28]/10 rounded-2xl p-6 mb-12 max-w-2xl mx-auto">
-          <p className="text-[#6B7280] dark:text-gray-400 text-sm leading-relaxed" style={{ whiteSpace: 'pre-wrap' }}>
-            {"¥49 = 一顿火锅\n\n但你知道吗？\n一顿火锅吃完就没了。\n¥49换来的，是：\n\n• 面试前一晚睡不着，有人陪你聊天\n• 被追问到大脑空白，有人告诉你怎么办\n• 等通知焦虑，有人帮你分析有没有戏\n• 崩溃的时候，有人接住你\n\n¥49买的不是一个工具，是一个朋友。"}
-          </p>
+        {/* 免费功能说明 */}
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-2xl p-6 mb-12 max-w-2xl mx-auto border border-green-200 dark:border-green-800">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">🆓</span>
+            <div>
+              <p className="font-medium text-green-700 dark:text-green-400 mb-2">永久免费</p>
+              <p className="text-sm text-green-600 dark:text-green-300 leading-relaxed">
+                紧张类型诊断 — 5种紧张类型，精准定位你的问题根源
+              </p>
+              <p className="text-sm text-green-600 dark:text-green-300 leading-relaxed mt-1">
+                阿搭聊天 — 面试前紧张、面试后崩溃、等通知焦虑，随时找阿搭聊
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* 定价卡片 */}
@@ -118,7 +123,7 @@ export function PricingSection() {
               </div>
 
               {/* 功能列表 */}
-              <ul className="space-y-3 mb-6">
+              <ul className="space-y-3 mb-4">
                 {plan.features.map((feature, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-[#6B7280] dark:text-gray-400">
                     <svg className="w-5 h-5 text-[#10B981] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -128,6 +133,11 @@ export function PricingSection() {
                   </li>
                 ))}
               </ul>
+
+              {/* 免费功能提示 */}
+              <p className="text-xs text-[#9CA3AF] dark:text-gray-500 mb-4 text-center">
+                {plan.freeNote}
+              </p>
 
               {/* CTA按钮 */}
               <Button
@@ -143,9 +153,9 @@ export function PricingSection() {
         {/* 底部提示 */}
         <div className="mt-12 text-center">
           <p className="text-sm text-[#9CA3AF]">
-            先做诊断，再决定要不要买。
+            先免费做诊断，再决定要不要练。
             <Link href="/diagnose" className="text-[#FF6B35] hover:underline ml-1">
-              免费诊断
+              免费诊断 →
             </Link>
           </p>
         </div>
@@ -153,11 +163,11 @@ export function PricingSection() {
         {/* 阿搭结语 */}
         <div className="mt-10 flex gap-4 max-w-md mx-auto">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B35] to-[#E55A28] flex items-center justify-center text-white font-medium flex-shrink-0">
-            阿
+            搭
           </div>
           <div className="bg-white dark:bg-[#252542] rounded-2xl rounded-tl-md p-4 shadow-lg">
             <p className="text-sm text-[#6B7280] dark:text-gray-400" style={{ whiteSpace: 'pre-wrap' }}>
-              {"其实很多人第一次用完就说'早知道就好了'。\n希望你不是其中之一。"}
+              {"很多人练完说'早知道就好了'。\n紧张诊断和阿搭聊天不花钱，先试试。"}
             </p>
           </div>
         </div>
