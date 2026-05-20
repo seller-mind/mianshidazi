@@ -50,7 +50,7 @@ export function getAdaSystemPrompt(tensionType?: TensionLevel): string {
     .replace('{typeName}', typeInfo.name)
     .replace('{typeDescription}', typeInfo.description)
     .replace('{symptoms}', typeInfo.symptoms.join('、'))
-    .replace('{advice}', typeInfo.advice[0]);
+    .replace('{advice}', typeInfo.advice.medium.join('；'));
 }
 
 // 面试场景的对话模板

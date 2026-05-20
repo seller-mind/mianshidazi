@@ -61,6 +61,8 @@ export default function DiagnosePage() {
     const typeInfo = TENSION_TYPES[result.primaryType];
     const performanceScore = Math.max(40, 100 - result.tensionIndex);
     const scoreLost = result.tensionIndex * 0.6;
+    const adviceLevel = result.tensionIndex <= 35 ? 'low' : result.tensionIndex <= 65 ? 'medium' : 'high';
+    const adviceLevelLabel = adviceLevel === 'low' ? '轻度' : adviceLevel === 'medium' ? '中度' : '重度';
 
     return (
       <main className="min-h-screen bg-gradient-to-b from-white to-orange-50 dark:from-[#1A1A2E] dark:to-[#252542] py-8 px-6">
@@ -168,12 +170,13 @@ export default function DiagnosePage() {
           <Card variant="highlight" className="mb-6">
             <div className="flex gap-3">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B35] to-[#E55A28] flex items-center justify-center text-white font-medium flex-shrink-0">
-                阿
+                搭
               </div>
               <div>
-                <h3 className="font-semibold text-[#1F2937] dark:text-white mb-2">阿搭的建议</h3>
+                <h3 className="font-semibold text-[#1F2937] dark:text-white mb-1">阿搭的建议</h3>
+                <p className="text-xs text-[#FF6B35] mb-2">紧张程度：{adviceLevelLabel} — 针对你的情况，这些方法最有效</p>
                 <ul className="space-y-2">
-                  {typeInfo.advice.map((advice, i) => (
+                  {typeInfo.advice[adviceLevel].map((advice, i) => (
                     <li key={i} className="text-sm text-[#6B7280] dark:text-gray-400 leading-relaxed">
                       {advice}
                     </li>
@@ -217,7 +220,7 @@ export default function DiagnosePage() {
             {/* 阿搭头像和消息 */}
             <div className="flex gap-3">
               <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#FF6B35] to-[#E55A28] flex items-center justify-center text-white font-medium flex-shrink-0 animate-float">
-                阿
+                搭
               </div>
               <div className="flex-1">
                 <div className="bg-white dark:bg-[#374151] rounded-2xl rounded-tl-md p-5 shadow-lg">
