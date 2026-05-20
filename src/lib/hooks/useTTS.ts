@@ -1,7 +1,6 @@
-// TTS v6 - 浏览器原生 SpeechSynthesis
-// 彻底换方案：不再用CosyVoice，用浏览器内置语音合成
-// 优点：无字符限制、无需服务器、点击即出声、免费
-// 浏览器兼容：Chrome/Safari/WebView均支持
+// TTS v7 - CosyVoice服务端并行合成 + 客户端顺序播放
+// 核心改动：服务端一次返回所有段URL，客户端只需一个请求
+// 优点：不会丢段、不会跳读、客户端逻辑极简
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 
@@ -17,7 +16,6 @@ export interface UseTTSOptions {
   isCompanion?: boolean;
 }
 
-// 清理文本：去括号内容、emoji、markdown
 function cleanText(text: string): string {
   return text
     .replace(/[（(][^）)]*[）)]/g, '')
@@ -34,14 +32,18 @@ function cleanText(text: string): string {
     .replace(/\*{1,2}([^*]+)\*{1,2}/g, '$1')
     .replace(/#{1,6}\s/g, '')
     .replace(/[「」『』]/g, '')
+    .replace(/[～~]/g, '，')
+    .replace(/→/g, '到')
     .replace(/—+/g, '——')
     .replace(/\n+/g, '；')
     .replace(/；{2,}/g, '；')
+    .replace(/。{2,}/g, '。')
+    .replace(/，{2,}/g, '，')
     .trim();
 }
 
 export function useTTS(options: UseTTSOptions = {}) {
-  const { isCompanion = false } = options;
+  const { persona = 'A', isCompanion = false } = options;
 
   const [state, setState] = useState<TTSState>({
     isPlaying: false,
@@ -50,119 +52,173 @@ export function useTTS(options: UseTTSOptions = {}) {
     error: null,
   });
 
-  const currentIdRef = useRef<string | null>(null);
+  const currentPlayRef = useRef<{ id: string; aborted: boolean } | null>(null);
+  const urlCache = useRef<Map<string, string[]>>(new Map());
+  const loadingPromises = useRef<Map<string, Promise<string[]>>>(new Map());
 
-  // 清理：组件卸载时停止播放
   useEffect(() => {
     return () => {
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
+      if (currentPlayRef.current) currentPlayRef.current.aborted = true;
     };
   }, []);
 
   const stop = useCallback(() => {
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-    }
-    currentIdRef.current = null;
+    if (currentPlayRef.current) currentPlayRef.current.aborted = true;
+    currentPlayRef.current = null;
     setState({ isPlaying: false, playingId: null, isLoading: false, error: null });
   }, []);
 
-  const play = useCallback((text: string, messageId: string) => {
+  // 请求TTS：一次拿全部URL
+  const fetchUrls = useCallback(async (text: string, messageId: string): Promise<string[]> => {
+    // 检查缓存
+    const cached = urlCache.current.get(messageId);
+    if (cached) return cached;
+
+    // 检查进行中的请求
+    const pending = loadingPromises.current.get(messageId);
+    if (pending) return pending;
+
+    const promise = (async () => {
+      try {
+        const clean = cleanText(text);
+        if (!clean) return [];
+
+        const params = new URLSearchParams({
+          text: clean,
+          persona,
+          isCompanion: String(isCompanion),
+        });
+
+        const res = await fetch(`/api/tts?${params.toString()}`);
+        if (!res.ok) {
+          console.error('[TTS] API error:', res.status);
+          return [];
+        }
+
+        const data = await res.json();
+        const urls: string[] = data.urls || [];
+
+        if (urls.length > 0) {
+          urlCache.current.set(messageId, urls);
+        }
+
+        console.log(`[TTS] got ${urls.length} audio URLs for ${messageId}`);
+        return urls;
+      } catch (err) {
+        console.error('[TTS] fetch error:', err);
+        return [];
+      } finally {
+        loadingPromises.current.delete(messageId);
+      }
+    })();
+
+    loadingPromises.current.set(messageId, promise);
+    return promise;
+  }, [persona, isCompanion]);
+
+  // 预加载
+  const preload = useCallback((text: string, messageId: string) => {
+    if (urlCache.current.has(messageId) || loadingPromises.current.has(messageId)) return;
+    fetchUrls(text, messageId);
+  }, [fetchUrls]);
+
+  const isPreloaded = useCallback((messageId: string) => {
+    return urlCache.current.has(messageId);
+  }, []);
+
+  const isPreloading = useCallback(() => false, []);
+
+  // 播放单个音频
+  const playAudio = useCallback((url: string): Promise<void> => {
+    return new Promise((resolve) => {
+      const audio = new Audio();
+      audio.preload = 'auto';
+      audio.src = url;
+
+      let resolved = false;
+      const done = () => {
+        if (resolved) return;
+        resolved = true;
+        cleanup();
+        resolve();
+      };
+
+      const onEnded = () => done();
+      const onError = () => {
+        console.warn('[TTS] audio error');
+        done();
+      };
+      const cleanup = () => {
+        audio.removeEventListener('ended', onEnded);
+        audio.removeEventListener('error', onError);
+        clearTimeout(timer);
+      };
+
+      audio.addEventListener('ended', onEnded);
+      audio.addEventListener('error', onError);
+
+      // 单段最长60秒
+      const timer = setTimeout(() => {
+        console.warn('[TTS] segment timeout 60s');
+        audio.pause();
+        done();
+      }, 60000);
+
+      audio.play().catch(() => done());
+    });
+  }, []);
+
+  // 播放：拿到URL就出声
+  const play = useCallback(async (text: string, messageId: string) => {
     // 同一条消息再点→停止
-    if (currentIdRef.current === messageId && state.isPlaying) {
+    if (currentPlayRef.current?.id === messageId && state.isPlaying) {
       stop();
       return;
     }
 
     stop();
+    const playCtx = { id: messageId, aborted: false };
+    currentPlayRef.current = playCtx;
+    setState({ isPlaying: false, playingId: messageId, isLoading: true, error: null });
 
-    if (typeof window === 'undefined' || !window.speechSynthesis) {
-      console.error('[TTS] 浏览器不支持语音合成');
-      return;
-    }
+    try {
+      const urls = await fetchUrls(text, messageId);
 
-    const clean = cleanText(text);
-    if (!clean) return;
-
-    currentIdRef.current = messageId;
-
-    // Chrome长文本bug：超过约15秒会自动停止
-    // 解决方案：按句号分段，每段单独speak，串行播放
-    const sentences = clean.match(/[^。！？；]+[。！？；]?/g) || [clean];
-
-    let sentenceIndex = 0;
-
-    const speakNext = () => {
-      if (sentenceIndex >= sentences.length) {
-        // 全部读完
-        if (currentIdRef.current === messageId) {
-          currentIdRef.current = null;
-          setState({ isPlaying: false, playingId: null, isLoading: false, error: null });
-        }
+      if (playCtx.aborted) return;
+      if (urls.length === 0) {
+        setState({ isPlaying: false, playingId: null, isLoading: false, error: '语音不可用' });
+        currentPlayRef.current = null;
         return;
       }
 
-      // 被中断了
-      if (currentIdRef.current !== messageId) return;
+      // 开始播放
+      setState({ isPlaying: true, playingId: messageId, isLoading: false, error: null });
 
-      const utterance = new SpeechSynthesisUtterance(sentences[sentenceIndex]);
-      utterance.lang = 'zh-CN';
-      utterance.rate = isCompanion ? 0.9 : 1.0;
-      utterance.pitch = 1.0;
-
-      // 选中文语音
-      const voices = window.speechSynthesis.getVoices();
-      const zhVoices = voices.filter(v => v.lang.startsWith('zh'));
-
-      if (zhVoices.length > 0) {
-        if (isCompanion) {
-          // 陪伴模式：优先选女声
-          const female = zhVoices.find(v =>
-            /xiaoxiao|ting-ting|female|yaoyao|lili|huihui|kangkang/i.test(v.name) === false &&
-            /yunxi|yunjian|yunsuo|yuzhe/i.test(v.name) === false
-          ) || zhVoices.find(v => /xiaoxiao|ting|yaoyao|lili/i.test(v.name)) || zhVoices[0];
-          utterance.voice = female;
-        } else {
-          // 面试模式：优先选男声
-          const male = zhVoices.find(v => /yunxi|yunjian|yunsuo|yuzhe/i.test(v.name)) || zhVoices[0];
-          utterance.voice = male;
-        }
+      for (const url of urls) {
+        if (playCtx.aborted) return;
+        await playAudio(url);
+        if (playCtx.aborted) return;
       }
 
-      utterance.onend = () => {
-        sentenceIndex++;
-        speakNext();
-      };
-
-      utterance.onerror = (e) => {
-        console.warn('[TTS] speak error:', e.error);
-        // 跳过这句继续下一句
-        sentenceIndex++;
-        speakNext();
-      };
-
-      window.speechSynthesis.speak(utterance);
-    };
-
-    // 立即开始播放（第一次调用标记为playing）
-    setState({ isPlaying: true, playingId: messageId, isLoading: false, error: null });
-    speakNext();
-
-  }, [state.isPlaying, stop, isCompanion]);
-
-  // SpeechSynthesis不需要预加载
-  const preload = useCallback((_text: string, _messageId: string) => {}, []);
-  const isPreloaded = useCallback((_messageId: string) => false, []);
-  const isPreloading = useCallback(() => false, []);
+      // 播放完毕
+      if (!playCtx.aborted) {
+        currentPlayRef.current = null;
+        setState({ isPlaying: false, playingId: null, isLoading: false, error: null });
+      }
+    } catch (err) {
+      if (!playCtx.aborted) {
+        currentPlayRef.current = null;
+        setState({ isPlaying: false, playingId: null, isLoading: false, error: '播放失败' });
+      }
+    }
+  }, [state.isPlaying, stop, fetchUrls, playAudio]);
 
   const isPlayingMessage = useCallback((messageId: string) => {
-    return currentIdRef.current === messageId && state.isPlaying;
-  }, [state.isPlaying]);
+    return state.playingId === messageId && state.isPlaying;
+  }, [state.playingId, state.isPlaying]);
 
   const isLoadingMessage = useCallback((messageId: string) => {
-    return currentIdRef.current === messageId && state.isLoading;
+    return state.playingId === messageId && state.isLoading;
   }, [state.playingId, state.isLoading]);
 
   return {
