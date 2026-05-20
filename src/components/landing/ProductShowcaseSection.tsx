@@ -43,9 +43,9 @@ export function ProductShowcaseSection() {
     {
       emoji: '🧠',
       title: '真实知识来源',
-      description: '阿搭说的每句话都有据可查：脉脉HR分享、有机构调查、心理学研究。加持你的面试。',
+      description: '阿搭说的话，是有来源的：有机构调查、心理学研究，赋能你的面试。',
       color: 'from-cyan-50 to-teal-50 dark:from-cyan-900/20 dark:to-teal-900/20',
-      tag: 'V9新增',
+      tag: '知识支撑',
     },
   ];
 
