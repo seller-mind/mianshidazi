@@ -189,12 +189,30 @@ export function useTTS(options: UseTTSOptions = {}) {
 
   const isPreloading = useCallback(() => false, []);
 
-  // 播放单个音频
+  // 播放单个音频（Web Audio API增益放大1.5倍）
   const playAudio = useCallback((url: string): Promise<void> => {
     return new Promise((resolve) => {
       const audio = new Audio();
       audio.preload = 'auto';
       audio.src = url;
+
+      // 用Web Audio API放大音量
+      let audioCtx: AudioContext | null = null;
+      let source: MediaElementAudioSourceNode | null = null;
+      let gainNode: GainNode | null = null;
+
+      try {
+        audioCtx = new AudioContext();
+        source = audioCtx.createMediaElementSource(audio);
+        gainNode = audioCtx.createGain();
+        gainNode.gain.value = 1.5; // 音量放大1.5倍
+        source.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+      } catch (e) {
+        // 降级：直接播放（不放大）
+        console.warn('[TTS] Web Audio API not available, playing without boost');
+        audio.volume = 1.0;
+      }
 
       let resolved = false;
       const done = () => {
@@ -210,6 +228,10 @@ export function useTTS(options: UseTTSOptions = {}) {
         audio.removeEventListener('ended', onEnded);
         audio.removeEventListener('error', onError);
         clearTimeout(timer);
+        // 清理AudioContext
+        if (audioCtx && audioCtx.state !== 'closed') {
+          try { audioCtx.close(); } catch { /* ignore */ }
+        }
       };
 
       audio.addEventListener('ended', onEnded);
