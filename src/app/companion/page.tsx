@@ -151,6 +151,7 @@ export default function CompanionPage() {
     };
 
     setMessages(prev => [...prev, voiceMessage]);
+    setIsLoading(true); // 立即显示三个点
 
     // 后台STT
     (async () => {
@@ -171,10 +172,15 @@ export default function CompanionPage() {
             ));
             // 自动发给AI
             sendToAI(transcript, [...messages, { ...voiceMessage, content: transcript }]);
+          } else {
+            setIsLoading(false); // STT没识别出文字也要关loading
           }
+        } else {
+          setIsLoading(false); // STT请求失败也要关loading
         }
       } catch (err) {
         console.warn('[Voice] STT failed:', err);
+        setIsLoading(false); // STT异常也要关loading
       }
     })();
   }, [isLoading, messages, sendToAI]);

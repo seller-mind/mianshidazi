@@ -243,6 +243,7 @@ function PracticeContent() {
     };
 
     setMessages(prev => [...prev, voiceMessage]);
+    setIsLoading(true); // 立即显示三个点，不让用户以为卡了
 
     // 后台STT
     (async () => {
@@ -261,7 +262,6 @@ function PracticeContent() {
               msg.id === voiceId ? { ...msg, content: transcript } : msg
             ));
             // 发给AI
-            setIsLoading(true);
             try {
               const response = await fetch('/api/chat/interview', {
                 method: 'POST',
@@ -317,10 +317,15 @@ function PracticeContent() {
             } finally {
               setIsLoading(false);
             }
+          } else {
+            setIsLoading(false); // STT没识别出文字也要关loading
           }
+        } else {
+          setIsLoading(false); // STT请求失败也要关loading
         }
       } catch (err) {
         console.warn('[Voice] STT failed:', err);
+        setIsLoading(false); // STT失败也要关loading
       }
     })();
   }, [isLoading, selectedPersona, sessionId, tensionType, messages]);
