@@ -1,5 +1,5 @@
-// TTS API - 单段合成（避免Vercel 10秒超时）
-// 每次只合成一段文本，<3秒返回，不会超时
+// TTS API - 单段合成
+// 支持GET和POST，POST避免URL长度限制问题
 // 返回: { url: "https://..." }
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -44,18 +44,13 @@ function cleanText(text: string): string {
     .trim();
 }
 
-export async function GET(request: NextRequest) {
+async function handleRequest(text: string, persona: string, isCompanion: boolean) {
   if (!DASHSCOPE_API_KEY) {
     return NextResponse.json({ error: 'TTS未配置' }, { status: 500 });
   }
 
-  const { searchParams } = new URL(request.url);
-  const rawText = searchParams.get('text') || '';
-  const persona = searchParams.get('persona') || 'A';
-  const isCompanion = searchParams.get('isCompanion') === 'true';
-
-  const text = cleanText(rawText);
-  if (!text) {
+  const cleaned = cleanText(text);
+  if (!cleaned) {
     return NextResponse.json({ error: '没有可朗读的内容' }, { status: 400 });
   }
 
@@ -74,7 +69,7 @@ export async function GET(request: NextRequest) {
       },
       body: JSON.stringify({
         model: 'cosyvoice-v3-flash',
-        input: { text, voice, format: 'mp3', sample_rate: 22050, rate },
+        input: { text: cleaned, voice, format: 'mp3', sample_rate: 22050, rate },
       }),
       signal: controller.signal,
     });
@@ -104,5 +99,27 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '合成超时' }, { status: 504 });
     }
     return NextResponse.json({ error: '合成失败' }, { status: 500 });
+  }
+}
+
+// GET: text/persona/isCompanion 从 query params
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const text = searchParams.get('text') || '';
+  const persona = searchParams.get('persona') || 'A';
+  const isCompanion = searchParams.get('isCompanion') === 'true';
+  return handleRequest(text, persona, isCompanion);
+}
+
+// POST: text/persona/isCompanion 从 body（避免URL长度限制）
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const text = body.text || '';
+    const persona = body.persona || 'A';
+    const isCompanion = body.isCompanion === true;
+    return handleRequest(text, persona, isCompanion);
+  } catch {
+    return NextResponse.json({ error: '请求格式错误' }, { status: 400 });
   }
 }

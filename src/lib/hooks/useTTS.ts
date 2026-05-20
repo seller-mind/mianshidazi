@@ -102,7 +102,7 @@ function splitIntoSegments(text: string): string[] {
   return segments;
 }
 
-// 请求单段URL（2次重试）
+// 请求单段URL（2次重试，用POST避免URL长度限制）
 async function fetchSegmentUrl(
   text: string,
   persona: string,
@@ -111,11 +111,17 @@ async function fetchSegmentUrl(
 ): Promise<string | null> {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const params = new URLSearchParams({ text, persona, isCompanion: String(isCompanion) });
-      const res = await fetch(`/api/tts?${params.toString()}`);
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, persona, isCompanion }),
+      });
       if (res.ok) {
         const data = await res.json();
         if (data.url) return data.url;
+        console.warn(`[TTS] no url in response:`, data.error);
+      } else {
+        console.warn(`[TTS] HTTP ${res.status}`);
       }
     } catch (err) {
       console.warn('[TTS] fetch error:', err);
