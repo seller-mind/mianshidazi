@@ -73,7 +73,7 @@ export function PricingSection() {
         <div className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 rounded-2xl p-4 md:p-6 mb-8 md:mb-12 max-w-2xl mx-auto border border-orange-200 dark:border-orange-800">
           <p className="text-xs md:text-sm text-orange-700 dark:text-orange-300 text-center leading-relaxed">
             一杯奶茶的钱，换一场不再发抖的面试 ☕
-            少喝一次，练一次，下次上场不慌
+            少喝一次，多练一次，上场就多一分底气
           </p>
         </div>
 
