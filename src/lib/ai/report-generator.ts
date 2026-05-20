@@ -5,7 +5,7 @@ import { calculateTensionIndex, diagnoseTensionType } from './tension-detector';
 // 知识库引用（简化版）
 const KNOWLEDGE_QUOTES = [
   "有机构做过调查，48%的面试失败是因为答非所问",
-  "哈佛研究发现，紧张和兴奋是同一种身体反应",
+  "心理学研究发现，紧张和兴奋是同一种身体反应",
   "脉脉上有个HR分享过，他说面试官最怕遇到背答案的候选人",
   "我之前做HR的时候，看过上万份简历，真正加分的都是数据",
 ];

@@ -7,8 +7,8 @@ export function CounterintuitiveSection() {
       icon: '🤯',
       title: '紧张不是你的敌人',
       subtitle: '是信号',
-      content: '哈佛研究发现，紧张和兴奋是同一种身体反应。区别只在于你怎么解读它。把"我好紧张"换成"我好兴奋"，表现会显著提升。',
-      source: '哈佛商学院研究',
+      content: '研究发现，紧张和兴奋是同一种身体反应。区别只在于你怎么解读它。把"我好紧张"换成"我好兴奋"，表现会显著提升。',
+      source: '心理学研究',
     },
     {
       icon: '🎯',
@@ -83,8 +83,8 @@ export function CounterintuitiveSection() {
           </div>
           <div className="bg-[#2A2A45] rounded-2xl rounded-tl-md p-4">
             <p className="text-sm text-gray-300 leading-relaxed" style={{ whiteSpace: 'pre-wrap' }}>
-              "阿搭说的每句话，都有真实的来源。
-              不是编的，是真的。"
+              "阿搭说的每句话，都有据可查。
+              不是编的，是有来源的。"
             </p>
           </div>
         </div>

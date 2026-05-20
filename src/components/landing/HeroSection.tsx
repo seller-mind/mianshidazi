@@ -69,22 +69,6 @@ export function HeroSection() {
             </Button>
           </Link>
         </div>
-
-        {/* 社会证明 */}
-        <div className="flex flex-wrap justify-center gap-8 text-sm text-[#9CA3AF]">
-          <div className="flex items-center gap-2">
-            <span className="text-[#FF6B35] font-semibold">5种</span>
-            <span>紧张类型</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[#FF6B35] font-semibold">5种</span>
-            <span>面试官人格</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[#FF6B35] font-semibold">免费</span>
-            <span>紧张类型诊断</span>
-          </div>
-        </div>
       </div>
 
       {/* 向下滚动提示 */}
