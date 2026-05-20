@@ -37,7 +37,7 @@ export function HeroSection() {
         <div className="grid grid-cols-2 gap-2 mb-6 md:mb-10 md:flex md:flex-wrap md:justify-center md:gap-3">
           {[
             { emoji: '💪', text: '面试恐惧终结者' },
-            { emoji: '📚', text: '知识导师' },
+            { emoji: '📚', text: '知识分享者' },
             { emoji: '🤗', text: '情感陪伴者' },
             { emoji: '👀', text: '懂行朋友' },
           ].map((item) => (

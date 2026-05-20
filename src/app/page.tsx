@@ -19,7 +19,7 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF6B35] to-[#E55A28] flex items-center justify-center text-white font-bold text-sm">
-              阿
+              搭
             </div>
             <span className="font-semibold text-[#1F2937] dark:text-white">面试搭子</span>
           </Link>
