@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
               fullResponse += chunk;
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: chunk })}\n\n`));
             },
-            { temperature: 0.7, maxTokens: 300 }
+            { temperature: 0.7, maxTokens: 800 }
           );
 
           // 保存对话历史
