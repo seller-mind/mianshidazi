@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, Suspense } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { PERSONA_CONFIGS } from '@/lib/ai/prompts';
 import { Button, Card } from '@/components/ui';
 import { generateId } from '@/lib/utils';
@@ -12,6 +12,7 @@ import { VoiceInput } from '@/components/ui/VoiceInput';
 import { VoiceMessageBubble } from '@/components/ui/VoiceMessageBubble';
 import { useTTS } from '@/lib/hooks/useTTS';
 import { TTSPlayButton } from '@/components/ui/TTSPlayButton';
+import { LoginModal } from '@/components/LoginModal';
 
 interface Message {
   id: string;
@@ -25,6 +26,7 @@ interface Message {
 
 function PracticeContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const tensionType = (searchParams.get('type') as TensionLevel) || undefined;
   
   const [step, setStep] = useState<'select' | 'prepare' | 'interview'>('select');
@@ -34,6 +36,8 @@ function PracticeContent() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [interviewEnded, setInterviewEnded] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+  const [authChecking, setAuthChecking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // TTS 语音播放
@@ -54,39 +58,71 @@ function PracticeContent() {
     });
   }, [messages, preload, isLoading]);
 
-  // 开始面试
-  const startInterview = () => {
+  // 开始面试（带权益检查）
+  const startInterview = async () => {
     if (!selectedPersona) return;
     
-    setStep('interview');
-    
-    // 开场白
-    let intro = '';
-    switch (selectedPersona) {
-      case 'A':
-        intro = '你好呀，今天来做一次轻松的面试练习。准备好了吗？';
-        break;
-      case 'B':
-        intro = '你好，请坐。从自我介绍开始吧，1-2分钟。';
-        break;
-      case 'C':
-        intro = '嗯，开始吧。一分钟自我介绍，说重点。';
-        break;
-      case 'D':
-        intro = '行，开始。自我介绍，说重点，别废话。';
-        break;
-      case 'E':
-        intro = '你好，先自我介绍一下吧。对了，我们公司发展空间很大，机会很多。';
-        break;
-    }
+    setAuthChecking(true);
+    try {
+      // 1. 检查登录状态
+      const meRes = await fetch('/api/auth/me');
+      if (!meRes.ok) {
+        setShowLogin(true);
+        setAuthChecking(false);
+        return;
+      }
 
-    setMessages([
-      {
-        id: generateId(),
-        role: 'assistant',
-        content: intro,
-      },
-    ]);
+      // 2. 检查订阅权益
+      const subRes = await fetch('/api/subscription/check');
+      const subData = await subRes.json();
+      
+      if (!subData.canPractice) {
+        // 无权益，跳转到首页定价区
+        router.push('/#pricing');
+        setAuthChecking(false);
+        return;
+      }
+
+      // 3. 扣减面试次数（单次套餐需要扣）
+      if (subData.plan === 'single') {
+        await fetch('/api/subscription/check', { method: 'POST' });
+      }
+
+      // 4. 通过检查，开始面试
+      setStep('interview');
+      
+      // 开场白
+      let intro = '';
+      switch (selectedPersona) {
+        case 'A':
+          intro = '你好呀，今天来做一次轻松的面试练习。准备好了吗？';
+          break;
+        case 'B':
+          intro = '你好，请坐。从自我介绍开始吧，1-2分钟。';
+          break;
+        case 'C':
+          intro = '嗯，开始吧。一分钟自我介绍，说重点。';
+          break;
+        case 'D':
+          intro = '行，开始。自我介绍，说重点，别废话。';
+          break;
+        case 'E':
+          intro = '你好，先自我介绍一下吧。对了，我们公司发展空间很大，机会很多。';
+          break;
+      }
+
+      setMessages([
+        {
+          id: generateId(),
+          role: 'assistant',
+          content: intro,
+        },
+      ]);
+    } catch {
+      setShowLogin(true);
+    } finally {
+      setAuthChecking(false);
+    }
   };
 
   // 发送消息
@@ -421,13 +457,23 @@ function PracticeContent() {
             <Button
               size="lg"
               className="w-full"
-              disabled={!selectedPersona}
+              disabled={!selectedPersona || authChecking}
               onClick={startInterview}
             >
-              {selectedPersona ? `开始 ${PERSONA_CONFIGS[selectedPersona].name}` : '请先选择面试官'}
+              {authChecking ? '检查权益中...' : selectedPersona ? `开始 ${PERSONA_CONFIGS[selectedPersona].name}` : '请先选择面试官'}
             </Button>
           </div>
         </div>
+
+        {/* 登录弹窗 */}
+        <LoginModal
+          isOpen={showLogin}
+          onClose={() => setShowLogin(false)}
+          onSuccess={() => {
+            setShowLogin(false);
+            startInterview();
+          }}
+        />
       </main>
     );
   }

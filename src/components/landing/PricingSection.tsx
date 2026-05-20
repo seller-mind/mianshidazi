@@ -216,7 +216,15 @@ export function PricingSection() {
       </div>
 
       {/* 登录弹窗 */}
-      <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
+      <LoginModal
+        isOpen={showLogin}
+        onClose={() => setShowLogin(false)}
+        onSuccess={() => {
+          setShowLogin(false);
+          // 登录成功后重新触发购买
+          if (payingPlan) handleBuy(payingPlan);
+        }}
+      />
     </section>
   );
 }
