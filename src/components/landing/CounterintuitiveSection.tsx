@@ -77,7 +77,7 @@ export function CounterintuitiveSection() {
           </div>
           <div className="bg-[#2A2A45] rounded-2xl rounded-tl-md p-3 md:p-4">
             <p className="text-xs md:text-sm text-gray-300 leading-relaxed" style={{ whiteSpace: 'pre-wrap' }}>
-              "阿搭说的话，是有来源的。"
+              "阿搭说的每句话，背后都有人研究过。不是编的，是有来源的。"
             </p>
           </div>
         </div>
