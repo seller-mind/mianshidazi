@@ -128,7 +128,7 @@ export function VoiceInput({ onVoiceSend, disabled }: VoiceInputProps) {
   };
 
   return (
-    <div className="relative flex-shrink-0">
+    <div className="relative flex-shrink-0 flex flex-col items-center gap-0.5">
       <button
         type="button"
         onClick={toggle}
@@ -140,7 +140,7 @@ export function VoiceInput({ onVoiceSend, disabled }: VoiceInputProps) {
             ? 'bg-red-100 text-red-500'
             : 'bg-gray-100 text-gray-500 hover:bg-gray-200 active:bg-gray-300'
         } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
-        title={state === 'recording' ? '停止并发送' : '语音输入'}
+        title={state === 'recording' ? '停止并发送' : '点击录音'}
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
@@ -149,6 +149,9 @@ export function VoiceInput({ onVoiceSend, disabled }: VoiceInputProps) {
           <line x1="8" y1="23" x2="16" y2="23" />
         </svg>
       </button>
+      {state === 'idle' && !disabled && (
+        <span className="text-[10px] text-gray-400 leading-none">点击</span>
+      )}
 
       {state === 'recording' && (
         <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-2 whitespace-nowrap bg-red-500 text-white text-xs px-4 py-2 rounded-lg shadow-lg z-50">
