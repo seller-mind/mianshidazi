@@ -1,22 +1,13 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 
 interface VoiceInputProps {
-  onVoiceSend: (blob: Blob, durationMs: number) => void;
+  onVoiceSend: (localUrl: string, durationMs: number) => void;
   disabled?: boolean;
 }
 
-type VoiceState = 'idle' | 'recording' | 'recognizing' | 'error';
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type SpeechRecognitionCtor = any;
-
-function getSpeechRecognition(): SpeechRecognitionCtor | null {
-  if (typeof window === 'undefined') return null;
-  const w = window as any;
-  return w.SpeechRecognition || w.webkitSpeechRecognition || null;
-}
+type VoiceState = 'idle' | 'recording' | 'error';
 
 function canMediaRecord(): boolean {
   return typeof navigator !== 'undefined' &&
@@ -28,32 +19,38 @@ function canMediaRecord(): boolean {
 export function VoiceInput({ onVoiceSend, disabled }: VoiceInputProps) {
   const [state, setState] = useState<VoiceState>('idle');
   const [errorMsg, setErrorMsg] = useState('');
-  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [recordingMs, setRecordingMs] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
+  const startTimeRef = useRef<number>(0);
 
-  const stopRecording = useCallback(() => {
+  const cleanup = useCallback(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.stop();
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
     }
+    mediaRecorderRef.current = null;
+    chunksRef.current = [];
   }, []);
 
   const startRecording = useCallback(async () => {
     if (!canMediaRecord()) {
       setState('error');
-      setErrorMsg('请用浏览器打开使用语音');
-      setTimeout(() => setState('idle'), 3000);
+      setErrorMsg('请用浏览器打开');
+      setTimeout(() => setState('idle'), 2000);
       return;
     }
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
         : MediaRecorder.isTypeSupported('audio/webm')
@@ -62,42 +59,60 @@ export function VoiceInput({ onVoiceSend, disabled }: VoiceInputProps) {
 
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       chunksRef.current = [];
-      setRecordingDuration(0);
+      startTimeRef.current = Date.now();
 
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
 
       recorder.onstop = () => {
-        stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(chunksRef.current, { type: mimeType || 'audio/webm' });
+        const durationMs = Date.now() - startTimeRef.current;
 
-        // 最小录音时长检查：至少500ms
-        if (recordingDuration < 500) {
+        // 太短不算
+        if (durationMs < 300) {
+          cleanup();
           setState('idle');
+          setRecordingMs(0);
           return;
         }
 
-        // 自动发送语音
-        onVoiceSend(blob, recordingDuration);
+        const blob = new Blob(chunksRef.current, { type: mimeType || 'audio/webm' });
+        const localUrl = URL.createObjectURL(blob);
+
+        // 立即回调，不等任何网络请求
+        onVoiceSend(localUrl, durationMs);
+
+        cleanup();
         setState('idle');
+        setRecordingMs(0);
       };
 
       mediaRecorderRef.current = recorder;
       recorder.start();
       setState('recording');
+      setRecordingMs(0);
 
-      // 计时
+      // 计时器
       timerRef.current = window.setInterval(() => {
-        setRecordingDuration(d => d + 100);
+        setRecordingMs(d => d + 100);
       }, 100);
 
     } catch {
       setState('error');
       setErrorMsg('请允许麦克风权限');
-      setTimeout(() => setState('idle'), 3000);
+      setTimeout(() => setState('idle'), 2000);
     }
-  }, [onVoiceSend, recordingDuration]);
+  }, [onVoiceSend, cleanup]);
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
 
   const toggle = useCallback(() => {
     if (state === 'recording') {
@@ -107,15 +122,9 @@ export function VoiceInput({ onVoiceSend, disabled }: VoiceInputProps) {
     }
   }, [state, startRecording, stopRecording]);
 
-  // 格式化显示时长
-  const formatDuration = (ms: number) => {
-    const seconds = Math.floor(ms / 1000);
-    if (seconds < 60) {
-      return `${seconds}"`;
-    }
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}'${secs.toString().padStart(2, '0')}"`;
+  const formatTime = (ms: number) => {
+    const s = Math.floor(ms / 1000);
+    return s < 60 ? `${s}"` : `${Math.floor(s / 60)}'${(s % 60).toString().padStart(2, '0')}"`;
   };
 
   return (
@@ -123,7 +132,7 @@ export function VoiceInput({ onVoiceSend, disabled }: VoiceInputProps) {
       <button
         type="button"
         onClick={toggle}
-        disabled={disabled || state === 'recognizing'}
+        disabled={disabled}
         className={`flex items-center justify-center w-10 h-10 rounded-full transition-all ${
           state === 'recording'
             ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30'
@@ -131,10 +140,7 @@ export function VoiceInput({ onVoiceSend, disabled }: VoiceInputProps) {
             ? 'bg-red-100 text-red-500'
             : 'bg-gray-100 text-gray-500 hover:bg-gray-200 active:bg-gray-300'
         } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
-        title={
-          state === 'recording' ? '点击停止并发送'
-          : '语音输入'
-        }
+        title={state === 'recording' ? '停止并发送' : '语音输入'}
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
@@ -144,11 +150,10 @@ export function VoiceInput({ onVoiceSend, disabled }: VoiceInputProps) {
         </svg>
       </button>
 
-      {/* 录音时长显示 */}
       {state === 'recording' && (
         <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-2 whitespace-nowrap bg-red-500 text-white text-xs px-4 py-2 rounded-lg shadow-lg z-50">
-          <span className="font-mono text-sm">{formatDuration(recordingDuration)}</span>
-          <span className="text-red-200">点击停止发送</span>
+          <span className="font-mono text-sm">{formatTime(recordingMs)}</span>
+          <span className="text-red-200">点击发送</span>
         </div>
       )}
 

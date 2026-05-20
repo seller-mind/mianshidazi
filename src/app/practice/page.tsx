@@ -89,13 +89,14 @@ function PracticeContent() {
   };
 
   // 发送消息
-  const sendMessage = async () => {
-    if (!input.trim() || isLoading || !selectedPersona) return;
+  const sendMessage = useCallback(async (text?: string) => {
+    const msgText = text || input.trim();
+    if (!msgText || isLoading || !selectedPersona) return;
 
     const userMessage: Message = {
       id: generateId(),
       role: 'user',
-      content: input.trim(),
+      content: msgText,
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -192,7 +193,7 @@ function PracticeContent() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [input, isLoading, selectedPersona, sessionId, tensionType, messages]);
 
   // 结束面试
   const endInterview = () => {
@@ -226,128 +227,101 @@ function PracticeContent() {
     window.location.href = `/report?session=${sessionId}`;
   };
 
-  // 语音发送
-  const handleVoiceSend = useCallback(async (blob: Blob, durationMs: number) => {
+  // 语音发送：立即显示气泡，后台STT+AI
+  const handleVoiceSend = useCallback((localUrl: string, durationMs: number) => {
     if (isLoading || !selectedPersona) return;
 
-    // 上传获取URL
-    const formData = new FormData();
-    formData.append('audio', blob, 'voice.webm');
-
-    let voiceUrl = '';
-    try {
-      const uploadRes = await fetch('/api/voice-upload', { method: 'POST', body: formData });
-      if (uploadRes.ok) {
-        const uploadData = await uploadRes.json();
-        voiceUrl = uploadData.url || '';
-      }
-    } catch { /* ignore */ }
-
-    // 语音识别
-    let transcript = '';
-    try {
-      const sttFormData = new FormData();
-      sttFormData.append('audio', blob, 'voice.webm');
-      const sttRes = await fetch('/api/stt', { method: 'POST', body: sttFormData });
-      if (sttRes.ok) {
-        const sttData = await sttRes.json();
-        transcript = sttData.text || '';
-      }
-    } catch { /* ignore */ }
-
+    const voiceId = generateId();
     const voiceMessage: Message = {
-      id: generateId(),
+      id: voiceId,
       role: 'user',
-      content: transcript || '(语音消息)',
+      content: '(语音消息)',
       isVoice: true,
-      voiceUrl,
+      voiceUrl: localUrl,
       voiceDurationMs: durationMs,
     };
 
     setMessages(prev => [...prev, voiceMessage]);
 
-    if (transcript) {
-      setIsLoading(true);
+    // 后台STT
+    (async () => {
       try {
-        const response = await fetch('/api/chat/interview', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: transcript,
-            persona: selectedPersona,
-            sessionId,
-            tensionType,
-            history: messages.map(m => ({ role: m.role, content: m.content })),
-          }),
-        });
+        const res = await fetch(localUrl);
+        const blob = await res.blob();
+        const formData = new FormData();
+        formData.append('audio', blob, 'voice.webm');
 
-        if (!response.ok) throw new Error('发送失败');
-        if (!response.body) throw new Error('响应体为空');
+        const sttRes = await fetch('/api/stt', { method: 'POST', body: formData });
+        if (sttRes.ok) {
+          const sttData = await sttRes.json();
+          const transcript = sttData.text || '';
+          if (transcript) {
+            setMessages(prev => prev.map(msg =>
+              msg.id === voiceId ? { ...msg, content: transcript } : msg
+            ));
+            // 发给AI
+            setIsLoading(true);
+            try {
+              const response = await fetch('/api/chat/interview', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  message: transcript,
+                  persona: selectedPersona,
+                  sessionId,
+                  tensionType,
+                  history: [...messages, { ...voiceMessage, content: transcript }].map(m => ({ role: m.role, content: m.content })),
+                }),
+              });
+              if (!response.ok) throw new Error('发送失败');
+              if (!response.body) throw new Error('响应体为空');
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let assistantMessage = '';
-        const assistantId = generateId();
+              const reader = response.body.getReader();
+              const decoder = new TextDecoder();
+              let assistantMessage = '';
+              const assistantId = generateId();
+              setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '' }]);
 
-        setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '' }]);
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n');
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6);
-              if (data === '[DONE]') {
-                if (!assistantMessage.trim()) {
-                  setMessages(prev =>
-                    prev.map(msg =>
-                      msg.id === assistantId
-                        ? { ...msg, content: '抱歉，暂时无法回复，请稍后重试。' }
-                        : msg
-                    )
-                  );
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value, { stream: true });
+                for (const line of chunk.split('\n')) {
+                  if (line.startsWith('data: ')) {
+                    const data = line.slice(6);
+                    if (data === '[DONE]') break;
+                    try {
+                      const parsed = JSON.parse(data);
+                      if (parsed.error) {
+                        setMessages(prev => prev.map(msg =>
+                          msg.id === assistantId ? { ...msg, content: `出错了: ${parsed.error}` } : msg
+                        ));
+                        break;
+                      }
+                      if (parsed.content) {
+                        assistantMessage += parsed.content;
+                        setMessages(prev => prev.map(msg =>
+                          msg.id === assistantId ? { ...msg, content: assistantMessage } : msg
+                        ));
+                      }
+                    } catch { /* ignore */ }
+                  }
                 }
-                break;
               }
-              try {
-                const parsed = JSON.parse(data);
-                if (parsed.error) {
-                  setMessages(prev =>
-                    prev.map(msg =>
-                      msg.id === assistantId
-                        ? { ...msg, content: `出错了: ${parsed.error}` }
-                        : msg
-                    )
-                  );
-                  break;
-                }
-                if (parsed.content) {
-                  assistantMessage += parsed.content;
-                  setMessages(prev =>
-                    prev.map(msg =>
-                      msg.id === assistantId
-                        ? { ...msg, content: assistantMessage }
-                        : msg
-                    )
-                  );
-                }
-              } catch { /* ignore */ }
+            } catch (error) {
+              setMessages(prev => [...prev, {
+                id: generateId(), role: 'assistant',
+                content: `抱歉，出了点问题: ${error instanceof Error ? error.message : '请稍后重试'}`,
+              }]);
+            } finally {
+              setIsLoading(false);
             }
           }
         }
-      } catch (error) {
-        setMessages(prev => [
-          ...prev,
-          { id: generateId(), role: 'assistant', content: `抱歉，出了点问题: ${error instanceof Error ? error.message : '请稍后重试'}` },
-        ]);
-      } finally {
-        setIsLoading(false);
+      } catch (err) {
+        console.warn('[Voice] STT failed:', err);
       }
-    }
+    })();
   }, [isLoading, selectedPersona, sessionId, tensionType, messages]);
 
   // 语音转文字
@@ -592,7 +566,7 @@ function PracticeContent() {
                 rows={1}
               />
               <Button
-                onClick={sendMessage}
+                onClick={() => sendMessage()}
                 disabled={!input.trim() || isLoading}
                 isLoading={isLoading}
               >
