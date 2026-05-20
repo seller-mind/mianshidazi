@@ -16,14 +16,14 @@ export function HeroSection() {
         {/* 阿搭头像 */}
         <div className="mb-8 animate-float">
           <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-[#FF6B35] to-[#E55A28] flex items-center justify-center text-white text-4xl font-bold shadow-xl shadow-[#FF6B35]/30">
-            阿
+            搭
           </div>
-          <p className="mt-3 text-[#FF6B35] font-medium">我是阿搭</p>
+          <p className="mt-3 text-[#FF6B35] font-medium">我是阿搭，你的面试搭子</p>
         </div>
 
         {/* 主标题 - V9核心Slogan */}
         <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-[#1F2937] dark:text-white leading-tight mb-6">
-          你不是不会，
+          你不是不会
           <br />
           <span className="text-[#FF6B35]">你只是太紧张了</span>
         </h1>
@@ -55,7 +55,12 @@ export function HeroSection() {
         <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
           <Link href="/diagnose">
             <Button size="lg" className="animate-pulse-glow w-full sm:w-auto">
-              🔍 免费测你的紧张类型
+              🔍 紧张类型诊断
+            </Button>
+          </Link>
+          <Link href="/practice">
+            <Button variant="outline" size="lg" className="w-full sm:w-auto">
+              🎯 模拟面试
             </Button>
           </Link>
           <Link href="/companion">
@@ -77,7 +82,7 @@ export function HeroSection() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-[#FF6B35] font-semibold">免费</span>
-            <span>紧张诊断</span>
+            <span>紧张类型诊断</span>
           </div>
         </div>
       </div>

@@ -24,7 +24,7 @@ export function PainPointSection() {
       description: '每天刷八百遍邮箱/招聘APP，一有消息就心跳加速',
       emoji: '😰',
       color: 'from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20',
-      quote: '"前程无忧做过调查，48%的人说收到等通知基本就没戏了。但关键看过程，不只是那句话。"',
+      quote: '"有机构做过调查，48%的人说收到等通知基本就没戏了。但关键看过程，不只是那句话。"',
     },
     {
       title: '面试失败崩溃',

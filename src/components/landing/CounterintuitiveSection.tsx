@@ -21,15 +21,15 @@ export function CounterintuitiveSection() {
       icon: '⏰',
       title: '"等通知"有四种可能',
       subtitle: '凉只是其中一种',
-      content: '前程无忧调查：48%的人说收到等通知基本就没戏了。但也可能是：你是备胎、流程慢、要安排二面。关键看面试过程本身。',
-      source: '前程无忧HR论坛',
+      content: '有机构调查：48%的人说收到等通知基本就没戏了。但也可能是：你是备胎、流程慢、要安排二面。关键看面试过程本身。',
+      source: '有机构HR论坛',
     },
     {
       icon: '😤',
       title: '群面别抢当Leader',
       subtitle: '团队贡献度更重要',
       content: '群面淘汰率70%，但"团队贡献度"权重30%，"领导行为"权重只有15%。安静记录者可能比乱带节奏的Leader更受欢迎。',
-      source: '前程无忧调研',
+      source: '有机构调研',
     },
   ];
 

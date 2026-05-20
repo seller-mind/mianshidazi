@@ -26,10 +26,10 @@ export default function HomePage() {
           
           <div className="flex items-center gap-6">
             <Link href="/diagnose" className="text-sm text-[#6B7280] hover:text-[#FF6B35] transition-colors">
-              免费诊断
+              紧张类型诊断
             </Link>
             <Link href="/practice" className="text-sm text-[#6B7280] hover:text-[#FF6B35] transition-colors">
-              AI练习
+              模拟面试
             </Link>
             <Link href="/companion" className="text-sm text-[#6B7280] hover:text-[#FF6B35] transition-colors">
               阿搭聊天

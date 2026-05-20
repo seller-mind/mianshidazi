@@ -36,14 +36,14 @@ export function ProductShowcaseSection() {
     {
       emoji: '🎭',
       title: 'KPI面识别',
-      description: '教你识别"等两小时面十分钟"不是你的问题。前程无忧数据支撑，不是编的。',
+      description: '教你识别"等两小时面十分钟"不是你的问题。有机构数据支撑，不是编的。',
       color: 'from-purple-50 to-violet-50 dark:from-purple-900/20 dark:to-violet-900/20',
       tag: '独家功能',
     },
     {
       emoji: '🧠',
       title: '真实知识来源',
-      description: '阿搭说的每句话都有真实来源：脉脉HR分享、前程无忧调查、哈佛研究。加持你的面试。',
+      description: '阿搭说的每句话都有真实来源：脉脉HR分享、有机构调查、哈佛研究。加持你的面试。',
       color: 'from-cyan-50 to-teal-50 dark:from-cyan-900/20 dark:to-teal-900/20',
       tag: 'V9新增',
     },
