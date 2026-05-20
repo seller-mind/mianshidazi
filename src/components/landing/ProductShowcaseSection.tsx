@@ -58,7 +58,7 @@ export function ProductShowcaseSection() {
             阿搭能帮你做什么？
           </h2>
           <p className="text-lg text-[#6B7280] dark:text-gray-400">
-            不只是帮你不再紧张，是陪你从害怕到上场
+            帮你不再紧张，帮你从容控场
           </p>
         </div>
 
