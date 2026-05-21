@@ -187,14 +187,13 @@ export function PricingSection() {
           </p>
         </div>
 
-        <div className="mt-6 md:mt-10 flex gap-3 md:gap-4 max-w-md mx-auto">
-          <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-[#FF6B35] to-[#E55A28] flex items-center justify-center text-white text-xs md:text-sm font-medium flex-shrink-0">
-            搭
-          </div>
-          <div className="bg-white dark:bg-[#252542] rounded-2xl rounded-tl-md p-3 md:p-4 shadow-lg">
-            <p className="text-xs md:text-sm text-[#6B7280] dark:text-gray-400" style={{ whiteSpace: 'pre-wrap' }}>
-              {"很多人练完说'早知道就好了'。\n紧张诊断和阿搭聊天不花钱，先试试。"}
-            </p>
+        <div className="mt-6 md:mt-10 text-center">
+          <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mb-2">反馈及联系</p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6 text-xs md:text-sm text-gray-500 dark:text-gray-400">
+            <a href="mailto:haimozhouqiu@outlook.com" className="hover:text-[#FF6B35] transition-colors">
+              📧 haimozhouqiu@outlook.com
+            </a>
+            <span>💬 微信：txd027</span>
           </div>
         </div>
       </div>
