@@ -8,6 +8,19 @@ function getSupabase() {
   );
 }
 
+function generateRandomNickname(): string {
+  const adjectives = ["勇敢的", "机智的", "沉稳的", "自信的", "温暖的", "专注的", "从容的", "淡定的", "坚韧的", "灵动的"];
+  const nouns = ["求职者", "追梦人", "奋斗者", "挑战者", "前行者", "探索者", "攀登者", "实践者", "破局者", "行动派"];
+  const num = Math.floor(Math.random() * 9000 + 1000);
+  return `${adjectives[Math.floor(Math.random() * adjectives.length)]}${nouns[Math.floor(Math.random() * nouns.length)]}${num}`;
+}
+
+function generateDefaultAvatar(): string {
+  const colors = ["FF6B35", "4F46E5", "059669", "DC2626", "7C3AED", "0891B2", "CA8A04", "BE185D"];
+  const color = colors[Math.floor(Math.random() * colors.length)];
+  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#${color}"/><text x="50" y="62" text-anchor="middle" font-size="45" fill="white" font-family="sans-serif">😊</text></svg>`)}`;
+}
+
 async function sendSmsCode(phone: string): Promise<{ success: boolean; detail: string; sessionId?: string; code?: string }> {
   const accessKeyId = process.env.ALIYUN_SMS_ACCESS_KEY_ID;
   const accessKeySecret = process.env.ALIYUN_SMS_ACCESS_KEY_SECRET;
@@ -224,7 +237,7 @@ async function loginUser(phone: string) {
   if (!user) {
     const { data: newUser, error: createErr } = await supabase
       .from('users')
-      .insert({ phone, nickname: `用户${phone.slice(-4)}` })
+      .insert({ phone, nickname: generateRandomNickname(), avatar_url: generateDefaultAvatar() })
       .select()
       .single();
 
@@ -240,12 +253,12 @@ async function loginUser(phone: string) {
   const token = sign(
     { userId: user.id, phone: user.phone },
     jwtSecret,
-    { expiresIn: '7d' }
+    { expiresIn: '30d' }
   );
 
   const response = NextResponse.json({
     success: true,
-    user: { id: user.id, phone: user.phone, nickname: user.nickname },
+    user: { id: user.id, phone: user.phone, nickname: user.nickname, avatar_url: user.avatar_url },
     token, // 同时返回token给前端存localStorage
   });
 
@@ -253,7 +266,7 @@ async function loginUser(phone: string) {
     httpOnly: true,
     secure: true,
     sameSite: 'lax',
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: 60 * 60 * 24 * 30,
     path: '/',
   });
 

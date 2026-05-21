@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { PERSONA_CONFIGS } from '@/lib/ai/prompts';
 import { Button, Card } from '@/components/ui';
+import { useAuthContext } from '@/components/AuthProvider';
 import { generateId } from '@/lib/utils';
 import type { PersonaType, TensionLevel } from '@/types';
 import { AIBadge } from '@/components/AIDisclaimer';
@@ -36,15 +37,62 @@ function PracticeContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [interviewEnded, setInterviewEnded] = useState(false);
   const [authChecking, setAuthChecking] = useState(false);
+  const { user: authUser } = useAuthContext();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // TTS 语音播放
   const { play, preload, isPlayingMessage, isLoadingMessage } = useTTS({ persona: selectedPersona || 'A' });
 
+  // 保存消息到Supabase
+  const saveMessages = useCallback(async (msgs: Message[]) => {
+    if (msgs.length === 0) return;
+    try {
+      const token = localStorage.getItem('msd_token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      
+      // Create/update session
+      await fetch('/api/chat/sessions', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          session_id: sessionId,
+          type: 'interview',
+          persona: selectedPersona,
+          title: selectedPersona ? `${PERSONA_CONFIGS[selectedPersona]?.name || '模拟面试'}` : '模拟面试',
+        }),
+      });
+      
+      // Save messages
+      await fetch('/api/chat/messages', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          session_id: sessionId,
+          messages: msgs.map(m => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            is_voice: m.isVoice || false,
+          })),
+        }),
+      });
+    } catch (err) {
+      console.warn('[Practice] Save messages failed:', err);
+    }
+  }, [sessionId, selectedPersona]);
+
   // 滚动到底部
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // 自动保存消息到Supabase（每次消息变化时）
+  useEffect(() => {
+    if (messages.length > 1 && selectedPersona) {
+      saveMessages(messages);
+    }
+  }, [messages, saveMessages, selectedPersona]);
 
   // 预加载语音：AI回复过程中就预加载（内容hash变化会自动重载）
   useEffect(() => {
@@ -239,6 +287,8 @@ function PracticeContent() {
       setIsLoading(false);
     }
   }, [input, isLoading, selectedPersona, sessionId, tensionType, messages]);
+
+
 
   // 结束面试
   const endInterview = () => {
@@ -543,51 +593,66 @@ function PracticeContent() {
               key={msg.id}
               className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-start gap-2`}
             >
-              {msg.role === 'assistant' && msg.content && (
-                <TTSPlayButton
-                  isPlaying={isPlayingMessage(msg.id)}
-                  isLoading={isLoadingMessage(msg.id)}
-                  onClick={() => play(msg.content, msg.id)}
-                  disabled={!msg.content.trim()}
-                  size="sm"
-                />
+              {msg.role === 'assistant' && (
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF6B35] to-[#E55A28] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">搭</div>
               )}
-              {msg.isVoice && msg.voiceUrl ? (
-                <div className={msg.role === 'user' ? 'flex flex-col items-end gap-1' : 'flex flex-col items-start gap-1'}>
-                  <VoiceMessageBubble
-                    audioUrl={msg.voiceUrl}
-                    durationMs={msg.voiceDurationMs || 1000}
-                    isUser={msg.role === 'user'}
-                    onTranscript={msg.voiceTranscript ? undefined : (text) => handleVoiceTranscript(msg.id, text)}
+              <div className="flex flex-col gap-1 max-w-[80%]">
+                {msg.role === 'assistant' && msg.content && (
+                  <TTSPlayButton
+                    isPlaying={isPlayingMessage(msg.id)}
+                    isLoading={isLoadingMessage(msg.id)}
+                    onClick={() => play(msg.content, msg.id)}
+                    disabled={!msg.content.trim()}
+                    size="sm"
                   />
-                  {msg.voiceTranscript && (
-                    <p className="text-xs text-gray-400 max-w-[85%] px-2">
-                      {msg.voiceTranscript}
-                    </p>
+                )}
+                {msg.isVoice && msg.voiceUrl ? (
+                  <div className={msg.role === 'user' ? 'flex flex-col items-end gap-1' : 'flex flex-col items-start gap-1'}>
+                    <VoiceMessageBubble
+                      audioUrl={msg.voiceUrl}
+                      durationMs={msg.voiceDurationMs || 1000}
+                      isUser={msg.role === 'user'}
+                      onTranscript={msg.voiceTranscript ? undefined : (text) => handleVoiceTranscript(msg.id, text)}
+                    />
+                    {msg.voiceTranscript && (
+                      <p className="text-xs text-gray-400 max-w-[85%] px-2">
+                        {msg.voiceTranscript}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                <div
+                  className={`px-4 py-3 rounded-2xl ${
+                    msg.role === 'user'
+                      ? 'bg-[#FF6B35] text-white rounded-tr-md'
+                      : 'bg-gray-100 dark:bg-[#2A2A45] text-[#1F2937] dark:text-gray-100 rounded-tl-md'
+                  }`}
+                  style={{ whiteSpace: 'pre-wrap' }}
+                >
+                  {msg.role === 'assistant' && (
+                    <div className="flex items-center gap-1 mb-1">
+                      <AIBadge />
+                    </div>
+                  )}
+                  {msg.content}
+                </div>
+                )}
+              </div>
+              {msg.role === 'user' && (
+                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                  {authUser?.avatar_url ? (
+                    <img src={authUser.avatar_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-sm">😊</span>
                   )}
                 </div>
-              ) : (
-              <div
-                className={`max-w-[85%] px-4 py-3 rounded-2xl ${
-                  msg.role === 'user'
-                    ? 'bg-[#FF6B35] text-white rounded-tr-md'
-                    : 'bg-gray-100 dark:bg-[#2A2A45] text-[#1F2937] dark:text-gray-100 rounded-tl-md'
-                }`}
-                style={{ whiteSpace: 'pre-wrap' }}
-              >
-                {msg.role === 'assistant' && (
-                  <div className="flex items-center gap-1 mb-1">
-                    <AIBadge />
-                  </div>
-                )}
-                {msg.content}
-              </div>
               )}
             </div>
           ))}
           
           {isLoading && (
-            <div className="flex justify-start">
+            <div className="flex justify-start items-start gap-2">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF6B35] to-[#E55A28] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">搭</div>
               <div className="bg-gray-100 dark:bg-[#2A2A45] px-4 py-3 rounded-2xl rounded-tl-md">
                 <div className="flex gap-1">
                   <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />

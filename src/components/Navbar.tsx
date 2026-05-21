@@ -66,6 +66,9 @@ export function Navbar() {
                 {user?.email || user?.phone?.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')}
                 {activePlan && <span style={{ marginLeft: '4px', color: '#FF6B35' }}>· {activePlan === 'single' ? '单次' : activePlan === 'monthly' ? '月卡' : '季卡'}</span>}
               </span>
+              <Link href="/profile" style={{ fontSize: '12px', color: '#6B7280', textDecoration: 'none' }}>
+                设置
+              </Link>
               <button onClick={handleLogout} style={{ fontSize: '12px', color: '#9CA3AF', background: 'none', border: 'none', cursor: 'pointer' }}>
                 退出
               </button>
@@ -109,6 +112,20 @@ export function Navbar() {
           </Link>
           
           {isLoggedIn ? (
+            <>
+            <Link
+              href="/profile"
+              style={{
+                padding: '4px 10px',
+                backgroundColor: '#F3F4F6',
+                fontSize: '10px',
+                color: '#6B7280',
+                textDecoration: 'none',
+                borderRadius: '6px',
+              }}
+            >
+              设置
+            </Link>
             <button
               onClick={handleLogout}
               style={{
@@ -123,6 +140,7 @@ export function Navbar() {
             >
               退出
             </button>
+            </>
           ) : (
             <Link
               href="/login"
