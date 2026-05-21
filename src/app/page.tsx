@@ -1,6 +1,7 @@
 'use client';
 
-import Link from 'next/link';
+import { useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   HeroSection,
   PainPointSection,
@@ -11,8 +12,22 @@ import {
 } from '@/components/landing';
 import CookieConsent from '@/components/CookieConsent';
 import { Navbar } from '@/components/Navbar';
+import { Suspense } from 'react';
 
-export default function HomePage() {
+function HomeContent() {
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get('pricing') === 'true') {
+      setTimeout(() => {
+        const el = document.getElementById('pricing');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 300);
+    }
+  }, [searchParams]);
+
   return (
     <main className="min-h-screen">
       <Navbar />
@@ -22,7 +37,9 @@ export default function HomePage() {
       <PainPointSection />
       <CounterintuitiveSection />
       <ProductShowcaseSection />
-      <PricingSection />
+      <div id="pricing">
+        <PricingSection />
+      </div>
 
       {/* 页脚 - 使用共享Footer组件 */}
       <Footer />
@@ -30,5 +47,13 @@ export default function HomePage() {
       {/* Cookie同意弹窗 */}
       <CookieConsent />
     </main>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense>
+      <HomeContent />
+    </Suspense>
   );
 }
