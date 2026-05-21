@@ -480,7 +480,7 @@ function PracticeContent() {
             你已经体验过一次模拟面试啦！解锁更多练习，让面试紧张不再拖后腿。
           </p>
           <div className="space-y-3">
-            <Link href="/?pricing=true" className="block w-full py-3 bg-[#FF6B35] text-white rounded-xl font-medium text-lg hover:bg-[#E55A28] transition-colors">
+            <Link href="/pricing" className="block w-full py-3 bg-[#FF6B35] text-white rounded-xl font-medium text-lg hover:bg-[#E55A28] transition-colors">
               查看套餐 →
             </Link>
             <button
