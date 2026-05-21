@@ -622,40 +622,38 @@ function PracticeContent() {
           </div>
         </div>
       ) : (
-        <footer className="bg-white dark:bg-[#252542] border-t border-gray-100 dark:border-gray-800 px-6 py-3">
+        <footer className="bg-white dark:bg-[#252542] border-t border-gray-100 dark:border-gray-800 px-4 py-3">
           <div className="max-w-2xl mx-auto">
-            <div className="flex gap-3 items-end">
+            {/* 语音输入 - 主交互方式 */}
+            <div className="flex items-center justify-center mb-2">
               <VoiceInput
                 onVoiceSend={handleVoiceSend}
                 disabled={isLoading}
               />
-              <textarea
+            </div>
+            {/* 文字输入 - 辅助 */}
+            <div className="flex gap-2 items-center">
+              <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="输入你的回答..."
-                className="flex-1 px-4 py-3 bg-gray-100 dark:bg-[#1A1A2E] rounded-xl text-[#1F2937] dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#FF6B35] resize-none"
-                rows={1}
+                placeholder="也可以打字回答..."
+                className="flex-1 px-3 py-2 bg-gray-100 dark:bg-[#1A1A2E] rounded-lg text-sm text-[#1F2937] dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-[#FF6B35]"
               />
-              <Button
-                onClick={() => sendMessage()}
-                disabled={!input.trim() || isLoading}
-                isLoading={isLoading}
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                </svg>
-              </Button>
-            </div>
-            <div className="flex items-center justify-between mt-2">
-              <p className="text-xs text-gray-400">
-                按 Enter 发送
-              </p>
+              {input.trim() && (
+                <button
+                  onClick={() => sendMessage()}
+                  disabled={isLoading}
+                  className="px-3 py-2 bg-[#FF6B35] text-white rounded-lg text-sm font-medium active:scale-95 transition-transform"
+                >
+                  发送
+                </button>
+              )}
               <button
                 onClick={endInterview}
-                className="text-xs text-gray-400 hover:text-[#FF6B35] transition-colors"
+                className="px-3 py-2 text-xs text-gray-400 hover:text-[#FF6B35] transition-colors"
               >
-                结束面试 →
+                结束面试
               </button>
             </div>
           </div>
