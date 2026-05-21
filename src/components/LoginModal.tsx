@@ -76,7 +76,7 @@ export function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
               value={phone}
               onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
               placeholder="请输入手机号"
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#1A1A2E] text-[#1F2937] dark:text-white text-sm focus:outline-none focus:border-[#FF6B35] mb-3"
+              className="w-full px-4 py-3.5 rounded-xl border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-[#1A1A2E] text-[#1F2937] dark:text-white text-base placeholder:text-gray-400 focus:outline-none focus:border-[#FF6B35] mb-3"
               maxLength={11}
             />
             <button
@@ -95,7 +95,7 @@ export function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
               value={code}
               onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
               placeholder="6位验证码"
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#1A1A2E] text-[#1F2937] dark:text-white text-sm focus:outline-none focus:border-[#FF6B35] mb-3 text-center text-lg tracking-widest"
+              className="w-full px-4 py-3.5 rounded-xl border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-[#1A1A2E] text-[#1F2937] dark:text-white text-base placeholder:text-gray-400 focus:outline-none focus:border-[#FF6B35] mb-3 text-center text-xl tracking-[0.5em]"
               maxLength={6}
               autoFocus
             />
