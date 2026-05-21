@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (!token) {
-      return NextResponse.json({ user: null, subscriptions: [] });
+      return NextResponse.json({ user: null, subscriptions: [], _v: '2.0', _reason: 'no_token' });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (error || !user) {
-      return NextResponse.json({ user: null, subscriptions: [] });
+      return NextResponse.json({ user: null, subscriptions: [], _v: '2.0', _reason: 'user_not_found', _error: error?.message });
     }
 
     // 查订阅
@@ -56,7 +56,8 @@ export async function GET(request: NextRequest) {
       },
       subscriptions: subs || [],
     });
-  } catch {
-    return NextResponse.json({ user: null, subscriptions: [] });
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ user: null, subscriptions: [], _v: '2.0', _reason: 'exception', _error: errMsg.substring(0, 200) });
   }
 }
