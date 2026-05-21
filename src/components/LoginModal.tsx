@@ -76,8 +76,8 @@ export function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
     width: '100%',
     padding: '16px',
     borderRadius: '12px',
-    border: '2px solid #D1D5DB',
-    backgroundColor: '#F9FAFB',
+    border: '2px solid #9CA3AF',
+    backgroundColor: '#FFFFFF',
     color: '#1F2937',
     fontSize: '18px',
     outline: 'none',
@@ -103,7 +103,7 @@ export function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
         
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <h2 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1F2937', margin: 0 }}>登录面试搭子</h2>
-          <button onClick={onClose} style={{ fontSize: '24px', color: '#9CA3AF', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1 }}>&times;</button>
+          <button onClick={onClose} style={{ fontSize: '28px', color: '#374151', background: '#F3F4F6', border: 'none', cursor: 'pointer', lineHeight: 1, width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>&times;</button>
         </div>
 
         {step === 'phone' ? (
@@ -124,6 +124,7 @@ export function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
                 style={{
                   ...inputBaseStyle,
                   marginBottom: 0,
+                  color: phone ? '#1F2937' : '#6B7280',
                 }}
               />
               {phone.length > 0 && (
