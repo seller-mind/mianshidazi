@@ -87,7 +87,7 @@ function PracticeContent() {
       
       if (!subData.canPractice) {
         // 无权益，跳转到首页定价区
-        router.push('/#pricing');
+        router.push('/?pricing=true');
         setAuthChecking(false);
         return;
       }
