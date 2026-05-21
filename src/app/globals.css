@@ -32,6 +32,23 @@
   box-sizing: border-box;
 }
 
+/* 覆盖 Tailwind v4 preflight 对 input 的重置 */
+input[type="text"],
+input[type="tel"],
+input[type="number"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+input:not([type]) {
+  border: initial;
+  padding: initial;
+  margin: initial;
+  background-color: initial;
+  color: initial;
+  font-size: initial;
+  line-height: initial;
+}
+
 html {
   scroll-behavior: smooth;
 }
