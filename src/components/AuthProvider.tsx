@@ -5,6 +5,7 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 interface User {
   id: string;
   phone?: string;
+  email?: string;
   nickname?: string;
   avatar_url?: string;
 }

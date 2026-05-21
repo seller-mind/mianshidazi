@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useAuthContext } from '@/components/AuthProvider';
 
 export function Navbar() {
-  const { isLoggedIn, user, activePlan, logout } = useAuthContext();
+  const { isLoggedIn, user, activePlan } = useAuthContext();
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -20,6 +20,7 @@ export function Navbar() {
       zIndex: 50,
       backgroundColor: 'rgba(255,255,255,0.8)',
       backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
       borderBottom: '1px solid #F3F4F6',
     }}>
       <div style={{
@@ -47,8 +48,8 @@ export function Navbar() {
           <span style={{ fontWeight: 600, fontSize: '12px', color: '#1F2937', lineHeight: 1 }}>面试搭子</span>
         </Link>
         
-        {/* 桌面端 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }} className="hidden md:flex">
+        {/* 桌面端 - 用CSS media query控制显示 */}
+        <div className="navbar-desktop" style={{ display: 'none', alignItems: 'center', gap: '24px' }}>
           <Link href="/diagnose" style={{ fontSize: '14px', color: '#6B7280', textDecoration: 'none' }}>
             紧张类型测试
           </Link>
@@ -62,7 +63,7 @@ export function Navbar() {
           {isLoggedIn ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <span style={{ fontSize: '12px', color: '#6B7280' }}>
-                {user?.phone?.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')}
+                {user?.email || user?.phone?.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')}
                 {activePlan && <span style={{ marginLeft: '4px', color: '#FF6B35' }}>· {activePlan === 'single' ? '单次' : activePlan === 'monthly' ? '月卡' : '季卡'}</span>}
               </span>
               <button onClick={handleLogout} style={{ fontSize: '12px', color: '#9CA3AF', background: 'none', border: 'none', cursor: 'pointer' }}>
@@ -102,15 +103,9 @@ export function Navbar() {
         </div>
 
         {/* 手机端 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }} className="md:hidden">
-          <Link href="/diagnose" style={{ fontSize: '10px', color: '#6B7280', textDecoration: 'none' }}>
-            🔍 紧张测试
-          </Link>
+        <div className="navbar-mobile" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Link href="/practice" style={{ fontSize: '10px', color: '#6B7280', textDecoration: 'none' }}>
             🎯 模拟面试
-          </Link>
-          <Link href="/companion" style={{ fontSize: '10px', color: '#6B7280', textDecoration: 'none' }}>
-            💬 阿搭聊天
           </Link>
           
           {isLoggedIn ? (

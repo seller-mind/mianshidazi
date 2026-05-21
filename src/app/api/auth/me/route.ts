@@ -4,38 +4,48 @@ import jwt from 'jsonwebtoken';
 export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get('msd_token')?.value;
+
     if (!token) {
-      return NextResponse.json({ user: null }, { status: 401 });
+      return NextResponse.json({ user: null, subscriptions: [] });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
-    
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
+      userId: string;
+      email?: string;
+      phone?: string;
+    };
+
     const { createAdminClient } = await import('@/lib/supabase/admin');
     const supabase = createAdminClient();
 
+    // 查用户
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, phone, nickname, avatar_url, created_at')
+      .select('id, email, phone, nickname, avatar_url')
       .eq('id', decoded.userId)
       .single();
 
     if (error || !user) {
-      return NextResponse.json({ user: null }, { status: 401 });
+      return NextResponse.json({ user: null, subscriptions: [] });
     }
 
-    // 同时获取用户订阅状态
-    const { data: subscriptions } = await supabase
+    // 查订阅
+    const { data: subs } = await supabase
       .from('subscriptions')
       .select('*')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false });
+      .eq('user_id', user.id);
 
     return NextResponse.json({
-      user,
-      subscriptions: subscriptions || [],
+      user: {
+        id: user.id,
+        email: user.email,
+        phone: user.phone,
+        nickname: user.nickname,
+        avatar_url: user.avatar_url,
+      },
+      subscriptions: subs || [],
     });
-  } catch (error) {
-    return NextResponse.json({ user: null }, { status: 401 });
+  } catch {
+    return NextResponse.json({ user: null, subscriptions: [] });
   }
 }

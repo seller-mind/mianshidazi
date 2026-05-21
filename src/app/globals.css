@@ -149,3 +149,13 @@ body {
 .dark .glass {
   background: rgba(45, 45, 74, 0.8);
 }
+
+/* 导航栏响应式 */
+@media (min-width: 768px) {
+  .navbar-desktop {
+    display: flex !important;
+  }
+  .navbar-mobile {
+    display: none !important;
+  }
+}
