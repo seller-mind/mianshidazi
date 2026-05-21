@@ -12,7 +12,6 @@ import { VoiceInput } from '@/components/ui/VoiceInput';
 import { VoiceMessageBubble } from '@/components/ui/VoiceMessageBubble';
 import { useTTS } from '@/lib/hooks/useTTS';
 import { TTSPlayButton } from '@/components/ui/TTSPlayButton';
-import { LoginModal } from '@/components/LoginModal';
 
 interface Message {
   id: string;
@@ -36,7 +35,6 @@ function PracticeContent() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [interviewEnded, setInterviewEnded] = useState(false);
-  const [showLogin, setShowLogin] = useState(false);
   const [authChecking, setAuthChecking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -67,7 +65,8 @@ function PracticeContent() {
       // 1. 检查登录状态
       const meRes = await fetch('/api/auth/me');
       if (!meRes.ok) {
-        setShowLogin(true);
+        // 未登录，跳转登录页
+        router.push('/login');
         setAuthChecking(false);
         return;
       }
@@ -119,7 +118,7 @@ function PracticeContent() {
         },
       ]);
     } catch {
-      setShowLogin(true);
+      router.push('/login');
     } finally {
       setAuthChecking(false);
     }
@@ -464,16 +463,6 @@ function PracticeContent() {
             </Button>
           </div>
         </div>
-
-        {/* 登录弹窗 */}
-        <LoginModal
-          isOpen={showLogin}
-          onClose={() => setShowLogin(false)}
-          onSuccess={() => {
-            setShowLogin(false);
-            startInterview();
-          }}
-        />
       </main>
     );
   }

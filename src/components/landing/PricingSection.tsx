@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui';
-import { LoginModal } from '@/components/LoginModal';
 
 // V10 定价方案 - 紧张诊断和阿搭聊天免费，模拟面试收费
 const PRICING_PLANS = [
@@ -215,16 +214,8 @@ export function PricingSection() {
         </div>
       </div>
 
-      {/* 登录弹窗 */}
-      <LoginModal
-        isOpen={showLogin}
-        onClose={() => setShowLogin(false)}
-        onSuccess={() => {
-          setShowLogin(false);
-          // 登录成功后重新触发购买
-          if (payingPlan) handleBuy(payingPlan);
-        }}
-      />
+      {/* 未登录时跳转登录页 */}
+      {showLogin && typeof window !== 'undefined' && (window.location.href = '/login')}
     </section>
   );
 }
