@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 
 const APP_ID = process.env.XUNHU_APP_ID || '';
 const APP_SECRET = process.env.XUNHU_APP_SECRET || '';
+const BASE_URL = 'https://www.mianshidazi.com';
 
 const PRICE_MAP: Record<string, { price: number; name: string }> = {
   single: { price: 9.9, name: '单次模拟面试' },
@@ -13,19 +14,21 @@ const PRICE_MAP: Record<string, { price: number; name: string }> = {
 
 export async function POST(request: NextRequest) {
   try {
-    // 验证登录状态
-    let token = request.cookies.get('msd_token')?.value;
+    // 验证登录状态 - 同时支持cookie和Authorization header
+    let token: string | undefined = request.cookies.get('msd_token')?.value;
+    
     if (!token) {
-      const authHeader = request.headers.get('authorization');
+      const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
       if (authHeader?.startsWith('Bearer ')) {
-        token = authHeader.slice(7);
+        token = authHeader.substring(7);
       }
     }
+    
     if (!token) {
       return NextResponse.json({ error: '请先登录' }, { status: 401 });
     }
 
-    let decoded;
+    let decoded: { userId: string };
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
     } catch {
@@ -62,15 +65,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '创建订单失败' }, { status: 500 });
     }
 
-    // 虎皮椒支付参数
+    // 虎皮椒支付参数 - 强制使用www版本URL避免307重定向
     const params: Record<string, string> = {
       appid: APP_ID,
       out_trade_no: orderNo,
       total_fee: (plan.price * 100).toFixed(0),
       title: `面试搭子 - ${plan.name}`,
       time: Math.floor(Date.now() / 1000).toString(),
-      notify_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://mianshidazi.com'}/api/payment/callback`,
-      return_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://mianshidazi.com'}/payment/success?order=${orderNo}`,
+      notify_url: `${BASE_URL}/api/payment/callback`,
+      return_url: `${BASE_URL}/payment/success?order=${orderNo}`,
     };
 
     // 生成签名

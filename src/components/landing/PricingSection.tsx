@@ -4,7 +4,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui';
 
-// V10 定价方案 - 紧张诊断和阿搭聊天免费，模拟面试收费
 const PRICING_PLANS = [
   {
     id: 'single',
@@ -24,10 +23,9 @@ const PRICING_PLANS = [
   {
     id: 'monthly',
     name: '月卡会员',
-    price: 49,
-    priceLabel: '¥49/月',
-    originalPrice: 99,
-    description: '约等于5杯奶茶',
+    price: 29.9,
+    priceLabel: '¥29.9/月',
+    description: '约等于3杯奶茶',
     features: [
       '无限次模拟面试',
       '面试练习报告',
@@ -40,9 +38,8 @@ const PRICING_PLANS = [
   {
     id: 'quarterly',
     name: '季卡会员',
-    price: 119,
-    priceLabel: '¥119/季',
-    originalPrice: 279,
+    price: 69.9,
+    priceLabel: '¥69.9/季',
     description: '约等于2杯奶茶/月',
     features: [
       '无限次模拟面试',
@@ -57,7 +54,6 @@ const PRICING_PLANS = [
 ];
 
 export function PricingSection() {
-  const [showLogin, setShowLogin] = useState(false);
   const [payingPlan, setPayingPlan] = useState<string | null>(null);
   const [payLoading, setPayLoading] = useState(false);
 
@@ -65,16 +61,15 @@ export function PricingSection() {
     setPayLoading(true);
     setPayingPlan(planId);
     try {
-      // 获取token
       const token = typeof window !== 'undefined' ? localStorage.getItem('msd_token') : null;
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
       // 先检查是否登录
-      const meRes = await fetch('/api/auth/me', { headers: { ...headers, 'Content-Type': undefined } });
+      const meRes = await fetch('/api/auth/me', { headers: { Authorization: headers['Authorization'] || '' } });
       if (!meRes.ok) {
-        setShowLogin(true);
-        setPayLoading(false);
+        // 未登录，跳转登录页
+        window.location.href = '/login';
         return;
       }
 
@@ -88,7 +83,7 @@ export function PricingSection() {
 
       if (payData.error) {
         if (payData.error.includes('登录')) {
-          setShowLogin(true);
+          window.location.href = '/login';
         } else {
           alert(payData.error);
         }
@@ -109,7 +104,6 @@ export function PricingSection() {
   return (
     <section className="py-10 md:py-20 px-4 md:px-6 bg-gradient-to-b from-white to-orange-50 dark:from-[#1A1A2E] dark:to-[#252542]">
       <div className="max-w-4xl mx-auto">
-        {/* 标题 */}
         <div className="text-center mb-8 md:mb-12">
           <h2 className="text-2xl md:text-4xl font-bold text-[#1F2937] dark:text-white mb-3 md:mb-4">
             模拟面试，开启你的蜕变
@@ -119,7 +113,6 @@ export function PricingSection() {
           </p>
         </div>
 
-        {/* 价格参照说明 */}
         <div className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 rounded-2xl p-4 md:p-6 mb-8 md:mb-12 max-w-2xl mx-auto border border-orange-200 dark:border-orange-800">
           <p className="text-xs md:text-sm text-orange-700 dark:text-orange-300 text-center leading-relaxed">
             一杯奶茶的钱，换一场不再发抖的面试 ☕
@@ -127,7 +120,6 @@ export function PricingSection() {
           </p>
         </div>
 
-        {/* 定价卡片 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
           {PRICING_PLANS.map((plan) => (
             <div
@@ -144,7 +136,6 @@ export function PricingSection() {
                 </div>
               )}
 
-              {/* 套餐名称 */}
               <div className="text-center mb-3 md:mb-4">
                 <h3 className="text-base md:text-lg font-semibold text-[#1F2937] dark:text-white mb-1">
                   {plan.name}
@@ -154,19 +145,12 @@ export function PricingSection() {
                 </p>
               </div>
 
-              {/* 价格 */}
               <div className="text-center mb-4 md:mb-6">
                 <span className="text-2xl md:text-3xl font-bold text-[#1F2937] dark:text-white">
                   {plan.priceLabel}
                 </span>
-                {plan.originalPrice && (
-                  <div className="text-xs md:text-sm text-gray-400 line-through mt-1">
-                    ¥{plan.originalPrice}
-                  </div>
-                )}
               </div>
 
-              {/* 功能列表 */}
               <ul className="space-y-2 md:space-y-3 mb-3 md:mb-4">
                 {plan.features.map((feature, i) => (
                   <li key={i} className="flex items-start gap-2 text-xs md:text-sm text-[#6B7280] dark:text-gray-400">
@@ -178,12 +162,10 @@ export function PricingSection() {
                 ))}
               </ul>
 
-              {/* 免费功能提示 */}
               <p className="text-[10px] md:text-xs text-[#9CA3AF] dark:text-gray-500 mb-3 md:mb-4 text-center">
                 {plan.freeNote}
               </p>
 
-              {/* CTA按钮 */}
               <Button
                 variant={plan.popular ? 'primary' : 'outline'}
                 className="w-full text-sm md:text-base"
@@ -196,7 +178,6 @@ export function PricingSection() {
           ))}
         </div>
 
-        {/* 底部提示 */}
         <div className="mt-8 md:mt-12 text-center">
           <p className="text-xs md:text-sm text-[#9CA3AF]">
             先免费做诊断，再决定要不要练。
@@ -206,7 +187,6 @@ export function PricingSection() {
           </p>
         </div>
 
-        {/* 阿搭结语 */}
         <div className="mt-6 md:mt-10 flex gap-3 md:gap-4 max-w-md mx-auto">
           <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-[#FF6B35] to-[#E55A28] flex items-center justify-center text-white text-xs md:text-sm font-medium flex-shrink-0">
             搭
@@ -218,9 +198,6 @@ export function PricingSection() {
           </div>
         </div>
       </div>
-
-      {/* 未登录时跳转登录页 */}
-      {showLogin && typeof window !== 'undefined' && (window.location.href = '/login')}
     </section>
   );
 }
