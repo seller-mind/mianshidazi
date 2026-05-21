@@ -31,7 +31,7 @@ async function sendSmsCode(phone: string): Promise<{ success: boolean; detail: s
       phoneNumber: phone,
       signName: process.env.ALIYUN_SMS_SIGN_NAME || '速通互联验证码',
       templateCode: process.env.ALIYUN_SMS_TEMPLATE_CODE || '100001',
-      templateParam: JSON.stringify({ code: '##code##' }),
+      templateParam: '{"code":"##code##"}',
       codeLength: 6,
       codeType: 1, // 纯数字
       returnVerifyCode: true, // 返回验证码明文
