@@ -27,8 +27,32 @@ export default function CompanionPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState(() => generateId());
   const [context, setContext] = useState('日常');
-  const [restoringHistory, setRestoringHistory] = useState(true); // 正在加载历史
+  const [restoringHistory, setRestoringHistory] = useState(true);
+  const [voiceRemaining, setVoiceRemaining] = useState<number>(-1); // -1=无限(付费), >=0=剩余次数
+  const [voiceLimit, setVoiceLimit] = useState<number>(3);
+  const [showVoicePaywall, setShowVoicePaywall] = useState(false);
   const { user: authUser } = useAuthContext();
+
+  // 获取语音额度
+  const fetchVoiceLimit = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('msd_token');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch('/api/voice/limit', { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setVoiceRemaining(data.remaining);
+        setVoiceLimit(data.limit);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchVoiceLimit();
+  }, [fetchVoiceLimit]);
 
   // 保存消息到Supabase
   const saveMessages = useCallback(async (msgs: Message[]) => {
@@ -66,7 +90,6 @@ export default function CompanionPage() {
     }
   }, [sessionId]);
 
-  // 自动保存消息到Supabase
   useEffect(() => {
     if (messages.length > 1) {
       saveMessages(messages);
@@ -85,7 +108,6 @@ export default function CompanionPage() {
           const data = await res.json();
           const sessions = (data.sessions || []).filter((s: any) => s.type === 'companion');
           if (sessions.length > 0) {
-            // 找到最近的一次聊天，加载消息
             const latest = sessions[0];
             const msgRes = await fetch(`/api/chat/messages?session_id=${latest.id}`, { headers });
             if (msgRes.ok) {
@@ -108,7 +130,6 @@ export default function CompanionPage() {
       } catch {
         // ignore
       }
-      // 没有历史记录，显示欢迎语
       const hour = new Date().getHours();
       let welcomeContext = '日常';
       if (hour >= 0 && hour < 6) welcomeContext = '深夜';
@@ -219,9 +240,15 @@ export default function CompanionPage() {
     sendToAI(text, [...messages, userMessage]);
   }, [input, isLoading, messages, sendToAI]);
 
-  // 语音发送：立即显示气泡，后台STT
+  // 语音发送：先检查额度，再STT
   const handleVoiceSend = useCallback((localUrl: string, durationMs: number) => {
     if (isLoading) return;
+
+    // 免费用户额度为0时拦截
+    if (voiceRemaining === 0) {
+      setShowVoicePaywall(true);
+      return;
+    }
 
     const voiceId = generateId();
     const voiceMessage: Message = {
@@ -247,6 +274,10 @@ export default function CompanionPage() {
         if (sttRes.ok) {
           const sttData = await sttRes.json();
           const transcript = sttData.text || '';
+          // 更新剩余次数
+          if (sttData.voiceRemaining !== undefined) {
+            setVoiceRemaining(sttData.voiceRemaining);
+          }
           if (transcript) {
             setMessages(prev => prev.map(msg =>
               msg.id === voiceId ? { ...msg, content: transcript } : msg
@@ -255,6 +286,16 @@ export default function CompanionPage() {
           } else {
             setIsLoading(false);
           }
+        } else if (sttRes.status === 403) {
+          // 语音额度用完
+          const data = await sttRes.json();
+          if (data.voiceLimit) {
+            setVoiceRemaining(0);
+            setShowVoicePaywall(true);
+            // 移除刚添加的语音消息
+            setMessages(prev => prev.filter(msg => msg.id !== voiceId));
+          }
+          setIsLoading(false);
         } else {
           setIsLoading(false);
         }
@@ -263,9 +304,8 @@ export default function CompanionPage() {
         setIsLoading(false);
       }
     })();
-  }, [isLoading, messages, sendToAI]);
+  }, [isLoading, messages, sendToAI, voiceRemaining]);
 
-  // 语音转文字
   const handleVoiceTranscript = useCallback((messageId: string, text: string) => {
     setMessages(prev => prev.map(msg =>
       msg.id === messageId ? { ...msg, voiceTranscript: text } : msg
@@ -279,7 +319,6 @@ export default function CompanionPage() {
     }
   };
 
-  // 开始新对话
   const startNewChat = () => {
     setSessionId(generateId());
     setMessages([{
@@ -434,11 +473,46 @@ export default function CompanionPage() {
         </div>
       </div>
 
+      {/* 语音额度用完弹窗 */}
+      {showVoicePaywall && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#2A2A45] rounded-2xl p-6 max-w-sm w-full text-center">
+            <div className="text-4xl mb-3">🎙️</div>
+            <h3 className="text-white font-bold text-lg mb-2">今日免费语音已用完</h3>
+            <p className="text-gray-400 text-sm mb-5">免费用户每天可发{voiceLimit}条语音，文字聊天不限。升级套餐语音无限用。</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowVoicePaywall(false)}
+                className="flex-1 px-4 py-2.5 border border-gray-600 text-gray-300 rounded-xl text-sm hover:text-white"
+              >
+                用文字聊
+              </button>
+              <Link
+                href="/pricing"
+                className="flex-1 px-4 py-2.5 bg-[#FF6B35] text-white rounded-xl text-sm font-medium hover:bg-[#E55A28]"
+              >
+                升级套餐
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 输入框 */}
       <div className="bg-[#252542] border-t border-gray-800 px-4 py-4">
         <div className="max-w-2xl mx-auto">
           <div className="flex gap-2 items-end">
-            <VoiceInput onVoiceSend={handleVoiceSend} disabled={isLoading} />
+            <div className="flex flex-col items-center">
+              <VoiceInput 
+                onVoiceSend={handleVoiceSend} 
+                disabled={isLoading || voiceRemaining === 0} 
+              />
+              {voiceRemaining >= 0 && (
+                <span className="text-xs text-gray-500 mt-1">
+                  语音 {voiceRemaining}/{voiceLimit}
+                </span>
+              )}
+            </div>
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -453,7 +527,11 @@ export default function CompanionPage() {
               </svg>
             </Button>
           </div>
-          <p className="text-xs text-gray-500 mt-2 text-center">阿搭 24小时在线，随时陪你聊天</p>
+          <p className="text-xs text-gray-500 mt-2 text-center">
+            {voiceRemaining >= 0 
+              ? `文字聊天不限 · 语音每天${voiceLimit}条` 
+              : '阿搭 24小时在线，随时陪你聊天'}
+          </p>
         </div>
       </div>
     </div>

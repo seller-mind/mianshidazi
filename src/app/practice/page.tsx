@@ -40,11 +40,35 @@ function PracticeContent() {
   const [authChecking, setAuthChecking] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [restoringHistory, setRestoringHistory] = useState(true);
+  const [voiceRemaining, setVoiceRemaining] = useState<number>(-1);
+  const [voiceLimit, setVoiceLimit] = useState<number>(3);
+  const [showVoicePaywall, setShowVoicePaywall] = useState(false);
   const { user: authUser } = useAuthContext();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // TTS
   const { play, preload, isPlayingMessage, isLoadingMessage } = useTTS({ persona: selectedPersona || 'A' });
+
+  // 获取语音额度
+  const fetchVoiceLimit = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('msd_token');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch('/api/voice/limit', { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setVoiceRemaining(data.remaining);
+        setVoiceLimit(data.limit);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchVoiceLimit();
+  }, [fetchVoiceLimit]);
 
   // 进入页面时自动加载最近一次面试
   useEffect(() => {
@@ -345,6 +369,9 @@ function PracticeContent() {
         if (sttRes.ok) {
           const sttData = await sttRes.json();
           const transcript = sttData.text || '';
+          if (sttData.voiceRemaining !== undefined) {
+            setVoiceRemaining(sttData.voiceRemaining);
+          }
           if (transcript) {
             setMessages(prev => prev.map(msg =>
               msg.id === voiceId ? { ...msg, content: transcript } : msg
@@ -404,6 +431,14 @@ function PracticeContent() {
           } else {
             setIsLoading(false);
           }
+        } else if (sttRes.status === 403) {
+          const data = await sttRes.json();
+          if (data.voiceLimit) {
+            setVoiceRemaining(0);
+            setShowVoicePaywall(true);
+            setMessages(prev => prev.filter(msg => msg.id !== voiceId));
+          }
+          setIsLoading(false);
         } else {
           setIsLoading(false);
         }
@@ -614,8 +649,12 @@ function PracticeContent() {
       ) : (
         <footer className="bg-white dark:bg-[#252542] border-t border-gray-100 dark:border-gray-800 px-4 py-3">
           <div className="max-w-2xl mx-auto">
-            <div className="flex items-center justify-center mb-2">
-              <VoiceInput onVoiceSend={handleVoiceSend} disabled={isLoading} />
+            <div className="flex flex-col items-center mb-2">
+              <VoiceInput onVoiceSend={handleVoiceSend} disabled={isLoading || voiceRemaining === 0} />
+              {voiceRemaining >= 0 && (
+                <span className="text-xs text-gray-400 mt-1">语音 {voiceRemaining}/{voiceLimit}</span>
+              )}
+            </div>
             </div>
             <div className="flex gap-2 items-center">
               <input
@@ -636,6 +675,9 @@ function PracticeContent() {
     </main>
   );
 }
+
+  // 语音额度用完弹窗 - in interview view
+  // (shown as overlay on interview page)
 
 export default function PracticePage() {
   return (

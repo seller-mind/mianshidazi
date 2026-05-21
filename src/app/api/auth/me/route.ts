@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     // 查用户
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, email, phone, nickname, avatar_url')
+      .select('id, email, phone, nickname, avatar_url, free_interviews_used, free_voice_used')
       .eq('id', decoded.userId)
       .single();
 
@@ -53,6 +53,8 @@ export async function GET(request: NextRequest) {
         phone: user.phone,
         nickname: user.nickname,
         avatar_url: user.avatar_url,
+        free_interviews_used: user.free_interviews_used || 0,
+        free_voice_used: user.free_voice_used || 0,
       },
       subscriptions: subs || [],
     });

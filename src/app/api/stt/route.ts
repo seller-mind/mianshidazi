@@ -1,14 +1,107 @@
 // STT API - 语音转文字
-// 方案：客户端录音上传 → 服务端转base64 → 调qwen3-asr-flash（兼容模式API）
-// 优点：一个POST请求直接返回结果，无需上传文件/获取凭证/轮询
+// 增加：免费用户每日语音限额检查
 
 import { NextRequest, NextResponse } from 'next/server';
+import jwt from 'jsonwebtoken';
+import { createClient } from '@supabase/supabase-js';
 
 const DASHSCOPE_API_KEY = process.env.DASHSCOPE_API_KEY;
 
+function getToken(request: NextRequest): string | null {
+  let token = request.cookies.get('msd_token')?.value;
+  if (!token) {
+    const authHeader = request.headers.get('authorization');
+    if (authHeader?.startsWith('Bearer ')) token = authHeader.slice(7);
+  }
+  return token || null;
+}
+
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
+
+const FREE_VOICE_DAILY_LIMIT = 3;
+
+async function hasActiveSubscription(supabase: ReturnType<typeof getSupabase>, userId: string): Promise<boolean> {
+  const { data: subs } = await supabase
+    .from('subscriptions')
+    .select('id, plan_id, status, expires_at')
+    .eq('user_id', userId)
+    .eq('status', 'active');
+  if (!subs || subs.length === 0) return false;
+  const now = new Date();
+  return subs.some(s => !s.expires_at || new Date(s.expires_at) > now);
+}
+
+async function checkAndConsumeVoice(supabase: ReturnType<typeof getSupabase>, userId: string): Promise<{ allowed: boolean; remaining: number; isFree: boolean }> {
+  // 付费用户直接通过
+  if (await hasActiveSubscription(supabase, userId)) {
+    return { allowed: true, remaining: -1, isFree: false };
+  }
+
+  // 免费用户检查
+  const { data: user } = await supabase
+    .from('users')
+    .select('free_voice_used, free_voice_reset_at')
+    .eq('id', userId)
+    .single();
+
+  const now = new Date();
+  const resetAt = user?.free_voice_reset_at ? new Date(user.free_voice_reset_at) : null;
+  let used = user?.free_voice_used || 0;
+
+  // 非今天则重置
+  if (!resetAt || resetAt.toDateString() !== now.toDateString()) {
+    used = 0;
+    await supabase
+      .from('users')
+      .update({ free_voice_used: 0, free_voice_reset_at: now.toISOString() })
+      .eq('id', userId);
+  }
+
+  if (used >= FREE_VOICE_DAILY_LIMIT) {
+    return { allowed: false, remaining: 0, isFree: true };
+  }
+
+  // 扣次数
+  await supabase
+    .from('users')
+    .update({ free_voice_used: used + 1 })
+    .eq('id', userId);
+
+  return { allowed: true, remaining: FREE_VOICE_DAILY_LIMIT - used - 1, isFree: true };
+}
+
 export async function POST(request: NextRequest) {
+  // 先检查语音额度
+  const token = getToken(request);
+  if (!token) {
+    return NextResponse.json({ error: '请先登录' }, { status: 401 });
+  }
+
+  let decoded;
+  try {
+    decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
+  } catch {
+    return NextResponse.json({ error: '登录已过期' }, { status: 401 });
+  }
+
   if (!DASHSCOPE_API_KEY) {
     return NextResponse.json({ error: 'STT未配置' }, { status: 500 });
+  }
+
+  const supabase = getSupabase();
+  const voiceCheck = await checkAndConsumeVoice(supabase, decoded.userId);
+  if (!voiceCheck.allowed) {
+    return NextResponse.json({
+      error: '今日免费语音次数已用完',
+      voiceLimit: true,
+      remaining: 0,
+      isFree: true,
+    }, { status: 403 });
   }
 
   try {
@@ -16,25 +109,35 @@ export async function POST(request: NextRequest) {
     const audioFile = formData.get('audio') as File | null;
 
     if (!audioFile || audioFile.size < 500) {
+      // 音频太短，退回刚才扣的次数
+      if (voiceCheck.isFree) {
+        const { data: user } = await supabase
+          .from('users')
+          .select('free_voice_used')
+          .eq('id', decoded.userId)
+          .single();
+        if (user) {
+          await supabase
+            .from('users')
+            .update({ free_voice_used: Math.max(0, (user.free_voice_used || 1) - 1) })
+            .eq('id', decoded.userId);
+        }
+      }
       return NextResponse.json({ error: '音频太短' }, { status: 400 });
     }
 
-    // 音频大小限制：10MB
     if (audioFile.size > 10 * 1024 * 1024) {
       return NextResponse.json({ error: '音频文件过大' }, { status: 400 });
     }
 
     console.log(`[STT] received audio: ${audioFile.name}, size=${audioFile.size}, type=${audioFile.type}`);
 
-    // 读取音频并转base64
     const audioBuffer = await audioFile.arrayBuffer();
     const base64Audio = Buffer.from(audioBuffer).toString('base64');
 
-    // 确定MIME类型
     const mimeType = audioFile.type || 'audio/webm';
     const dataUri = `data:${mimeType};base64,${base64Audio}`;
 
-    // 调用qwen3-asr-flash（兼容模式API，一个POST直接返回结果）
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
@@ -87,7 +190,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: '未识别到内容，请再说一次' }, { status: 400 });
       }
 
-      return NextResponse.json({ text });
+      return NextResponse.json({ text, voiceRemaining: voiceCheck.remaining });
 
     } catch (err: unknown) {
       clearTimeout(timeoutId);
