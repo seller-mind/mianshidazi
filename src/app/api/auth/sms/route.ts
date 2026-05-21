@@ -40,13 +40,20 @@ async function sendSmsCode(phone: string): Promise<{ success: boolean; detail: s
     const runtime = new Util.RuntimeOptions({});
     const result = await client.sendSmsVerifyCodeWithOptions(sendReq, runtime);
 
-    const resultCode = result.body?.code;
-    const resultMsg = result.body?.message;
-    const sessionId = result.body?.sessionId;
-    const verifyCode = (result.body as any)?.verifyCode;
+    const body = result.body as any;
+    const resultCode = body?.code;
+    const resultMsg = body?.message;
+    // sessionId和verifyCode可能在body或body.model上
+    const sessionId = body?.sessionId || body?.model?.sessionId || '';
+    const verifyCode = body?.verifyCode || body?.model?.verifyCode || '';
+    const bodyKeys = body ? Object.keys(body) : [];
+    const modelKeys = body?.model ? Object.keys(body.model) : [];
+
+    console.log(`[SMS DEBUG] dypns返回: code=${resultCode}, message=${resultMsg}, sessionId=${sessionId}, verifyCode=${verifyCode}`);
+    console.log(`[SMS DEBUG] body keys: ${bodyKeys.join(',')}, model keys: ${modelKeys.join(',')}`);
 
     if (resultCode === 'OK') {
-      return { success: true, detail: '发送成功', sessionId, code: verifyCode };
+      return { success: true, detail: `发送成功(sid=${sessionId},code=${verifyCode},bkeys=${bodyKeys.join(',')},mkeys=${modelKeys.join(',')})`, sessionId, code: verifyCode };
     }
 
     return { success: false, detail: `dypns返回: code=${resultCode}, message=${resultMsg}` };
@@ -146,7 +153,7 @@ export async function POST(request: NextRequest) {
       // 清理过期的验证码
       await supabase.from('sms_codes').delete().lt('expires_at', new Date().toISOString());
 
-      return NextResponse.json({ success: true, message: '验证码已发送' });
+      return NextResponse.json({ success: true, message: '验证码已发送', _debug: smsResult.detail });
 
     } else if (action === 'verify') {
       if (!inputCode || !/^\d{6}$/.test(inputCode)) {
