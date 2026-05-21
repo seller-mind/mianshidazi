@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
+
+function verifyPassword(password: string, stored: string): boolean {
+  const [salt, hash] = stored.split(':');
+  const verifyHash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return hash === verifyHash;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,7 +19,6 @@ export async function POST(request: NextRequest) {
     const { createAdminClient } = await import('@/lib/supabase/admin');
     const supabase = createAdminClient();
 
-    // 查找用户
     const { data: user, error } = await supabase
       .from('users')
       .select('id, email, password_hash, nickname, avatar_url, phone')
@@ -24,17 +29,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '邮箱或密码错误' }, { status: 400 });
     }
 
-    // 验证密码
     if (!user.password_hash) {
       return NextResponse.json({ error: '该账号未设置密码，请先注册' }, { status: 400 });
     }
 
-    const valid = await bcrypt.compare(password, user.password_hash);
+    const valid = verifyPassword(password, user.password_hash);
     if (!valid) {
       return NextResponse.json({ error: '邮箱或密码错误' }, { status: 400 });
     }
 
-    // 生成JWT
     const token = jwt.sign(
       { userId: user.id, email: user.email, phone: user.phone },
       process.env.JWT_SECRET!,

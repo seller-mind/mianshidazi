@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
+
+function hashPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `${salt}:${hash}`;
+}
+
+export function verifyPassword(password: string, stored: string): boolean {
+  const [salt, hash] = stored.split(':');
+  const verifyHash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return hash === verifyHash;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,7 +41,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 加密密码
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = hashPassword(password);
 
     // 创建用户
     const { data: user, error } = await supabase
