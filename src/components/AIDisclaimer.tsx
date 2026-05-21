@@ -32,7 +32,7 @@ export default function AIDisclaimer({ compact = false, showInChat = false }: AI
           <span className="text-[10px]">根据《人工智能生成合成内容标识办法》标注</span>
         </div>
         <p className="leading-relaxed">
-          本对话内容由人工智能（阿里云百炼qwen-plus）自动生成，仅供参考。
+          本对话内容由人工智能自动生成，仅供参考。
           不构成专业的职业指导、心理治疗或法律建议。如有疑问，请咨询专业人士。
         </p>
       </div>
@@ -56,7 +56,7 @@ export default function AIDisclaimer({ compact = false, showInChat = false }: AI
           </div>
           
           <p className="text-sm text-amber-800 dark:text-amber-200 mb-3">
-            本页面/对话中的内容由人工智能（阿里云百炼qwen-plus）自动生成。
+            本页面/对话中的内容由人工智能自动生成。
           </p>
           
           <h4 className="text-xs font-semibold text-amber-900 dark:text-amber-100 mb-1">

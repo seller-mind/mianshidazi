@@ -24,10 +24,10 @@ export default function PrivacyConsent({ onConsent, mode = 'modal' }: PrivacyCon
           <div className="text-sm text-[#6B7280] dark:text-gray-400 space-y-2">
             <p><strong>我们收集：</strong>微信信息、手机号、使用数据、设备信息</p>
             <p><strong>数据存储：</strong>海外服务器（Supabase新加坡数据中心）</p>
-            <p><strong>第三方共享：</strong>阿里云百炼（AI服务）、虎皮椒（支付）、微软（语音）</p>
+            <p><strong>第三方共享：</strong>AI服务提供商、虎皮椒（支付）、语音合成服务</p>
             <p><strong>您的权利：</strong>访问、更正、删除个人信息</p>
             <p className="text-amber-600 dark:text-amber-400">
-              <strong>注意：</strong>数据跨境传输已获监管认可，您使用服务即表示同意
+              <strong>注意：</strong>数据跨境传输需您明确同意，您使用服务即表示同意数据存储在海外服务器
             </p>
           </div>
         </div>
@@ -75,7 +75,7 @@ export default function PrivacyConsent({ onConsent, mode = 'modal' }: PrivacyCon
                 <span className="text-xs text-amber-700 dark:text-amber-300">必读</span>
               </div>
               <p className="text-sm text-amber-800 dark:text-amber-200">
-                本服务使用阿里云百炼AI技术生成面试建议。<strong>AI内容仅供参考</strong>，
+                本服务使用AI技术生成面试建议。<strong>AI内容仅供参考</strong>，
                 不构成专业职业指导或心理治疗。如有严重焦虑或心理困扰，请寻求专业人士帮助。
               </p>
             </div>

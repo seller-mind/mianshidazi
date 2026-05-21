@@ -7,7 +7,7 @@ export const metadata = {
 
 export default function RefundPage() {
   return (
-    <LegalLayout title="退款政策" lastUpdated="2025年1月15日">
+    <LegalLayout title="退款政策" lastUpdated="2026年5月21日">
       <p className="text-sm text-gray-500 mb-6">
         我们理解您在购买服务后可能会改变主意。以下是面试搭子的退款政策，请仔细阅读。
       </p>
@@ -47,7 +47,7 @@ export default function RefundPage() {
         </tbody>
       </table>
 
-      <h3>2.2 月卡会员（49元/月）</h3>
+      <h3>2.2 月卡会员（39元/月）</h3>
       <table className="w-full border-collapse border border-gray-300 dark:border-gray-600 my-4">
         <thead>
           <tr className="bg-gray-100 dark:bg-gray-800">
@@ -71,7 +71,7 @@ export default function RefundPage() {
         </tbody>
       </table>
 
-      <h3>2.3 季卡会员（119元/季度）</h3>
+      <h3>2.3 季卡会员（99元/季度）</h3>
       <table className="w-full border-collapse border border-gray-300 dark:border-gray-600 my-4">
         <thead>
           <tr className="bg-gray-100 dark:bg-gray-800">
@@ -123,15 +123,13 @@ export default function RefundPage() {
       <h3>4.1 申请方式</h3>
       <p>如需申请退款，请通过以下方式联系我们：</p>
       <ul>
-        <li><strong>应用内客服</strong>：进入"我的 → 帮助与反馈 → 申请退款"</li>
-        <li><strong>邮箱</strong>：refund@mianshidazi.com</li>
-        <li><strong>工作时间</strong>：工作日 9:00-18:00</li>
+        <li><strong>邮箱</strong>：haimozhouqiu@outlook.com</li>
       </ul>
 
       <h3>4.2 申请材料</h3>
       <p>退款申请需包含以下信息：</p>
       <ul>
-        <li>您的账户信息（手机号或微信昵称）</li>
+        <li>您的账户信息（手机号）</li>
         <li>购买时间、订单号或交易流水号</li>
         <li>退款原因说明</li>
         <li>相关截图证明（如有）</li>
@@ -151,17 +149,9 @@ export default function RefundPage() {
         </tbody>
       </table>
 
-      <h2>五、自动续费取消</h2>
+      <h2>五、续费说明</h2>
       
-      <p>如您已开启自动续费功能，可以按以下方式取消：</p>
-      <ul>
-        <li>进入"我的 → 会员中心 → 自动续费管理"</li>
-        <li>点击"关闭自动续费"按钮</li>
-        <li>确认关闭后，将不再自动扣费</li>
-      </ul>
-      <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-        <strong>注意：</strong>取消自动续费不会影响您当前会员有效期，到期后不再自动扣费续期。
-      </p>
+      <p>面试搭子的会员服务不支持自动续费。会员到期后不会自动扣费，如需继续使用请手动购买。</p>
 
       <h2>六、支付平台说明</h2>
       
@@ -184,9 +174,8 @@ export default function RefundPage() {
       
       <p>如有退款相关问题，请联系我们：</p>
       <ul>
-        <li><strong>客服邮箱</strong>：refund@mianshidazi.com</li>
-        <li><strong>工作时间</strong>：工作日 9:00-18:00</li>
-        <li><strong>响应时间</strong>：24小时内回复</li>
+        <li><strong>客服邮箱</strong>：haimozhouqiu@outlook.com</li>
+        <li><strong>响应时间</strong>：我们会在3个工作日内回复您的退款申请</li>
       </ul>
 
       <hr className="my-8" />

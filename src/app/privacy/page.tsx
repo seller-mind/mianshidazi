@@ -7,7 +7,7 @@ export const metadata = {
 
 export default function PrivacyPage() {
   return (
-    <LegalLayout title="隐私政策" lastUpdated="2025年1月15日">
+    <LegalLayout title="隐私政策" lastUpdated="2026年5月21日">
       <p className="text-sm text-gray-500 mb-6">
         更新提示：根据《个人信息保护法》（PIPL）及相关法规要求，我们对隐私政策进行了更新，请您仔细阅读。
       </p>
@@ -17,9 +17,10 @@ export default function PrivacyPage() {
       <h3>1.1 我们收集的信息</h3>
       <p>为了向您提供面试搭子服务，我们会收集以下信息：</p>
       <ul>
-        <li><strong>账户信息</strong>：微信昵称、头像（通过微信授权获取）</li>
+        <li><strong>账户信息</strong>：昵称、头像（系统默认生成，可自行修改）</li>
         <li><strong>联系方式</strong>：手机号码（用于账号登录和重要通知）</li>
         <li><strong>使用数据</strong>：您进行的面试练习记录、紧张类型测试结果、对话内容</li>
+        <li><strong>语音数据</strong>：您通过语音输入功能提交的音频数据，用于语音转文字处理后即删除原始音频</li>
         <li><strong>设备信息</strong>：设备型号、操作系统版本，用于优化服务体验</li>
         <li><strong>支付信息</strong>：通过虎皮椒支付系统处理的交易信息（我们不存储完整银行卡信息）</li>
       </ul>
@@ -44,6 +45,7 @@ export default function PrivacyPage() {
       <ul>
         <li><strong>账户数据</strong>：您注销账户后30日内删除</li>
         <li><strong>对话记录</strong>：会员有效期满后90日内自动清除</li>
+        <li><strong>语音数据</strong>：语音转文字处理后立即删除原始音频，仅保留文字记录</li>
         <li><strong>支付记录</strong>：根据财务法规保留至少5年</li>
       </ul>
 
@@ -60,9 +62,10 @@ export default function PrivacyPage() {
       
       <p>未经您的同意，我们不会与任何第三方共享您的个人信息，但以下情况除外：</p>
       <ul>
-        <li><strong>阿里云百炼</strong>：用于AI对话生成，您的对话内容将传输至阿里云服务</li>
+        <li><strong>AI服务提供商</strong>：用于AI对话生成，您的对话内容将传输至AI服务商处理</li>
         <li><strong>虎皮椒支付</strong>：处理支付请求，遵守其隐私政策</li>
-        <li><strong>微软Edge TTS</strong>：提供语音朗读功能</li>
+        <li><strong>语音合成服务</strong>：提供AI语音朗读功能</li>
+        <li><strong>Vercel</strong>：提供网站托管服务，处理网页访问请求</li>
         <li><strong>法律要求</strong>：根据法律法规、政府要求或司法程序必须提供时</li>
       </ul>
 
@@ -80,7 +83,7 @@ export default function PrivacyPage() {
       <h3>如何行使您的权利</h3>
       <p>如需行使上述权利，请通过以下方式联系我们：</p>
       <ul>
-        <li>邮箱：privacy@mianshidazi.com</li>
+        <li>邮箱：haimozhouqiu@outlook.com</li>
         <li>客服：在应用内联系在线客服</li>
       </ul>
       <p>我们将在15个工作日内响应您的请求。</p>
@@ -104,7 +107,17 @@ export default function PrivacyPage() {
       </ul>
       <p>您可以在浏览器设置中管理或拒绝Cookie，但这可能影响部分功能。</p>
 
-      <h2>七、隐私政策更新</h2>
+      <h2>七、数据安全事件</h2>
+      
+      <p>如发生个人信息安全事件，我们将：</p>
+      <ul>
+        <li>立即启动应急预案，采取补救措施</li>
+        <li>在72小时内通知受影响的用户</li>
+        <li>向履行个人信息保护职责的部门报告</li>
+        <li>告知用户事件可能的影响和我们的应对措施</li>
+      </ul>
+
+      <h2>八、隐私政策更新</h2>
       
       <p>我们可能会不时更新本隐私政策。重大变更将：</p>
       <ul>
@@ -113,7 +126,7 @@ export default function PrivacyPage() {
         <li>重新获取您的同意（必要时）</li>
       </ul>
 
-      <h2>八、联系我们</h2>
+      <h2>九、联系我们</h2>
       
       <p>如果您对本隐私政策有任何疑问或担忧，请联系我们：</p>
       <ul>

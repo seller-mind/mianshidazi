@@ -42,6 +42,9 @@ export default function Footer({ showNavigation = true }: FooterProps) {
             <a href="mailto:haimozhouqiu@outlook.com" className="hover:text-white transition-colors">📧 haimozhouqiu@outlook.com</a>
             <span>💬 微信：txd027</span>
           </div>
+          <p className="mt-3 text-[10px] text-gray-600">
+            网站备案号：待补充（运营主体信息将在备案完成后更新）
+          </p>
         </div>
       </div>
     </footer>
