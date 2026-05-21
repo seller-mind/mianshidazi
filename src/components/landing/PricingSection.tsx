@@ -65,8 +65,13 @@ export function PricingSection() {
     setPayLoading(true);
     setPayingPlan(planId);
     try {
+      // 获取token
+      const token = typeof window !== 'undefined' ? localStorage.getItem('msd_token') : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       // 先检查是否登录
-      const meRes = await fetch('/api/auth/me');
+      const meRes = await fetch('/api/auth/me', { headers: { ...headers, 'Content-Type': undefined } });
       if (!meRes.ok) {
         setShowLogin(true);
         setPayLoading(false);
@@ -76,7 +81,7 @@ export function PricingSection() {
       // 创建支付订单
       const payRes = await fetch('/api/payment', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ planId }),
       });
       const payData = await payRes.json();

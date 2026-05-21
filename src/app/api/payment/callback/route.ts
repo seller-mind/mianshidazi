@@ -47,8 +47,11 @@ export async function POST(request: NextRequest) {
       const orderNo = params.out_trade_no;
       const xunhuTradeNo = params.trade_no || params.transaction_id || '';
 
-      const { createAdminClient } = await import('@/lib/supabase/admin');
-      const supabase = createAdminClient();
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
 
       // 查找订单
       const { data: order, error: orderError } = await supabase

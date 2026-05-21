@@ -7,14 +7,20 @@ const APP_SECRET = process.env.XUNHU_APP_SECRET || '';
 
 const PRICE_MAP: Record<string, { price: number; name: string }> = {
   single: { price: 9.9, name: '单次模拟面试' },
-  monthly: { price: 49, name: '月卡会员' },
-  quarterly: { price: 119, name: '季卡会员' },
+  monthly: { price: 29.9, name: '月卡会员' },
+  quarterly: { price: 69.9, name: '季卡会员' },
 };
 
 export async function POST(request: NextRequest) {
   try {
     // 验证登录状态
-    const token = request.cookies.get('msd_token')?.value;
+    let token = request.cookies.get('msd_token')?.value;
+    if (!token) {
+      const authHeader = request.headers.get('authorization');
+      if (authHeader?.startsWith('Bearer ')) {
+        token = authHeader.slice(7);
+      }
+    }
     if (!token) {
       return NextResponse.json({ error: '请先登录' }, { status: 401 });
     }
@@ -35,8 +41,11 @@ export async function POST(request: NextRequest) {
     const orderNo = `MSD${Date.now()}${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
 
     // 写入订单到数据库
-    const { createAdminClient } = await import('@/lib/supabase/admin');
-    const supabase = createAdminClient();
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
     const { error: orderError } = await supabase
       .from('orders')
