@@ -31,6 +31,7 @@ export default function CompanionPage() {
   const [voiceRemaining, setVoiceRemaining] = useState<number>(-1); // -1=无限(付费), >=0=剩余次数
   const [voiceLimit, setVoiceLimit] = useState<number>(3);
   const [showVoicePaywall, setShowVoicePaywall] = useState(false);
+  const [showTtsPaywall, setShowTtsPaywall] = useState(false);
   const { user: authUser } = useAuthContext();
 
   // 获取语音额度
@@ -156,11 +157,16 @@ export default function CompanionPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { play, isPlayingMessage, isLoadingMessage } = useTTS({ isCompanion: true });
+  const { play, isPlayingMessage, isLoadingMessage, ttsRemaining, ttsLimitHit, setTtsLimitHit } = useTTS({ isCompanion: true });
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // TTS额度用完弹窗
+  useEffect(() => {
+    if (ttsLimitHit) setShowTtsPaywall(true);
+  }, [ttsLimitHit]);
 
   // 发送消息给AI
   const sendToAI = useCallback(async (text: string, historyMessages: Message[]) => {
@@ -498,6 +504,31 @@ export default function CompanionPage() {
         </div>
       )}
 
+      {/* 朗读额度用完弹窗 */}
+      {showTtsPaywall && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#2A2A45] rounded-2xl p-6 max-w-sm w-full text-center">
+            <div className="text-4xl mb-3">🔊</div>
+            <h3 className="text-white font-bold text-lg mb-2">今日免费朗读已用完</h3>
+            <p className="text-gray-400 text-sm mb-5">免费用户每天可听10条AI朗读，文字聊天不限。升级套餐朗读无限用。</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowTtsPaywall(false); setTtsLimitHit(false); }}
+                className="flex-1 px-4 py-2.5 border border-gray-600 text-gray-300 rounded-xl text-sm hover:text-white"
+              >
+                关闭
+              </button>
+              <Link
+                href="/pricing"
+                className="flex-1 px-4 py-2.5 bg-[#FF6B35] text-white rounded-xl text-sm font-medium hover:bg-[#E55A28]"
+              >
+                升级套餐
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 输入框 */}
       <div className="bg-[#252542] border-t border-gray-800 px-4 py-4">
         <div className="max-w-2xl mx-auto">
@@ -529,7 +560,7 @@ export default function CompanionPage() {
           </div>
           <p className="text-xs text-gray-500 mt-2 text-center">
             {voiceRemaining >= 0 
-              ? `文字聊天不限 · 语音每天${voiceLimit}条` 
+              ? `文字不限 · 语音${voiceRemaining}/${voiceLimit} · 朗读${ttsRemaining >= 0 ? ttsRemaining : '∞'}/10` 
               : '阿搭 24小时在线，随时陪你聊天'}
           </p>
         </div>

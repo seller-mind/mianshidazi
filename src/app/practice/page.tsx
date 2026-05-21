@@ -43,11 +43,12 @@ function PracticeContent() {
   const [voiceRemaining, setVoiceRemaining] = useState<number>(-1);
   const [voiceLimit, setVoiceLimit] = useState<number>(3);
   const [showVoicePaywall, setShowVoicePaywall] = useState(false);
+  const [showTtsPaywall, setShowTtsPaywall] = useState(false);
   const { user: authUser } = useAuthContext();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // TTS
-  const { play, preload, isPlayingMessage, isLoadingMessage } = useTTS({ persona: selectedPersona || 'A' });
+  const { play, preload, isPlayingMessage, isLoadingMessage, ttsRemaining, ttsLimitHit, setTtsLimitHit } = useTTS({ persona: selectedPersona || 'A' });
 
   // 获取语音额度
   const fetchVoiceLimit = useCallback(async () => {
@@ -69,6 +70,11 @@ function PracticeContent() {
   useEffect(() => {
     fetchVoiceLimit();
   }, [fetchVoiceLimit]);
+
+  // TTS额度用完弹窗
+  useEffect(() => {
+    if (ttsLimitHit) setShowTtsPaywall(true);
+  }, [ttsLimitHit]);
 
   // 进入页面时自动加载最近一次面试
   useEffect(() => {
@@ -652,7 +658,7 @@ function PracticeContent() {
             <div className="flex flex-col items-center mb-2">
               <VoiceInput onVoiceSend={handleVoiceSend} disabled={isLoading || voiceRemaining === 0} />
               {voiceRemaining >= 0 && (
-                <span className="text-xs text-gray-400 mt-1">语音 {voiceRemaining}/{voiceLimit}</span>
+                <span className="text-xs text-gray-400 mt-1">语音 {voiceRemaining}/{voiceLimit} · 朗读 {ttsRemaining >= 0 ? ttsRemaining : '∞'}/10</span>
               )}
             </div>
             </div>

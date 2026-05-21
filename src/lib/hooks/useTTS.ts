@@ -133,33 +133,53 @@ async function resumeAudioContext(): Promise<boolean> {
 }
 
 // ---- 获取TTS URL（带AbortController支持） ----
+interface TTSFetchResult {
+  url: string | null;
+  ttsLimitHit?: boolean;
+  ttsRemaining?: number;
+}
+
 async function fetchSegmentUrl(
   text: string,
   persona: string,
   isCompanion: boolean,
   signal?: AbortSignal,
   maxRetries = 2
-): Promise<string | null> {
+): Promise<TTSFetchResult> {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
-    if (signal?.aborted) return null;
+    if (signal?.aborted) return { url: null };
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (typeof window !== 'undefined') {
+        const token = localStorage.getItem('msd_token');
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+      }
       const res = await fetch('/api/tts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ text, persona, isCompanion }),
         signal,
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.url) return data.url;
+        return { url: data.url || null, ttsRemaining: data.ttsRemaining };
+      }
+      if (res.status === 403) {
+        const data = await res.json();
+        if (data.ttsLimit) {
+          return { url: null, ttsLimitHit: true, ttsRemaining: 0 };
+        }
+      }
+      if (res.status === 401) {
+        return { url: null };
       }
     } catch (err) {
-      if ((err as Error).name === 'AbortError') return null;
+      if ((err as Error).name === 'AbortError') return { url: null };
       console.warn('[TTS] fetch error:', err);
     }
     if (attempt < maxRetries - 1) await new Promise(r => setTimeout(r, 300 * (attempt + 1)));
   }
-  return null;
+  return { url: null };
 }
 
 // ---- 缓存条目 ----
@@ -172,6 +192,8 @@ interface CacheEntry {
 // ---- Hook ----
 export function useTTS(options: UseTTSOptions = {}) {
   const { persona = 'A', isCompanion = false } = options;
+  const [ttsRemaining, setTtsRemaining] = useState<number>(-1); // -1=无限(付费), >=0=剩余
+  const [ttsLimitHit, setTtsLimitHit] = useState(false);
   const [state, setState] = useState<TTSState>({ isPlaying: false, playingId: null, isLoading: false, error: null });
   const currentPlayRef = useRef<{ id: string; aborted: boolean } | null>(null);
   const audioCache = useRef<Map<string, CacheEntry>>(new Map());
@@ -222,7 +244,13 @@ export function useTTS(options: UseTTSOptions = {}) {
         fetchSegmentUrl(seg, persona, isCompanion, controller.signal)
       );
 
-      const urls = await Promise.all(urlPromises);
+      const results = await Promise.all(urlPromises);
+      const urls = results.map(r => r.url);
+      // Update ttsRemaining from any result
+      for (const r of results) {
+        if (r.ttsRemaining !== undefined) setTtsRemaining(r.ttsRemaining);
+        if (r.ttsLimitHit) { setTtsLimitHit(true); return; }
+      }
 
       if (controller.signal.aborted) return;
 
@@ -343,7 +371,15 @@ export function useTTS(options: UseTTSOptions = {}) {
     );
 
     // 第一个segment先拿到就开始播放
-    const firstUrl = await urlPromises[0];
+    const firstResult = await urlPromises[0];
+    if (firstResult.ttsLimitHit) {
+      setTtsLimitHit(true);
+      setTtsRemaining(0);
+      setState({ isPlaying: false, playingId: null, isLoading: false, error: '今日朗读次数已用完' });
+      return;
+    }
+    if (firstResult.ttsRemaining !== undefined) setTtsRemaining(firstResult.ttsRemaining);
+    const firstUrl = firstResult.url;
     if (playCtx.aborted) return;
 
     if (firstUrl) {
@@ -361,7 +397,8 @@ export function useTTS(options: UseTTSOptions = {}) {
       // 播放剩余segments（URL应该已经拿到了因为并行请求）
       for (let i = 1; i < segments.length; i++) {
         if (playCtx.aborted) return;
-        const url = await urlPromises[i];
+        const segResult = await urlPromises[i];
+        const url = segResult.url;
         if (!url) continue;
         const audio = new Audio();
         audio.preload = 'auto';
@@ -384,5 +421,5 @@ export function useTTS(options: UseTTSOptions = {}) {
   const isPlayingMessage = useCallback((messageId: string) => state.playingId === messageId && state.isPlaying, [state.playingId, state.isPlaying]);
   const isLoadingMessage = useCallback((messageId: string) => state.playingId === messageId && state.isLoading, [state.playingId, state.isLoading]);
 
-  return { ...state, play, stop, preload, isPreloaded, isPlayingMessage, isLoadingMessage };
+  return { ...state, play, stop, preload, isPreloaded, isPlayingMessage, isLoadingMessage, ttsRemaining, ttsLimitHit, setTtsLimitHit };
 }

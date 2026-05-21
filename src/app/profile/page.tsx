@@ -229,6 +229,9 @@ export default function ProfilePage() {
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 今日语音：<span className="font-medium">{Math.max(0, 3 - (user.free_voice_used || 0))}</span> / 3 条（文字不限）
               </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                今日朗读：<span className="font-medium">{Math.max(0, 10 - (user.free_tts_used || 0))}</span> / 10 条
+              </p>
               <Link href="/pricing" className="inline-block mt-3 px-4 py-2 bg-[#FF6B35] text-white text-sm rounded-lg hover:bg-[#E55A28] transition-colors">
                 购买套餐
               </Link>
