@@ -1,21 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
-// 用Map存储session token（dypns验证码验证需要）
-const sessionStore = new Map<string, { sessionId: string; expires: number }>();
-
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, value] of sessionStore) {
-    if (value.expires < now) sessionStore.delete(key);
-  }
-}, 60000);
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 async function sendSmsCode(phone: string): Promise<{ success: boolean; detail: string; sessionId?: string; code?: string }> {
   const accessKeyId = process.env.ALIYUN_SMS_ACCESS_KEY_ID;
   const accessKeySecret = process.env.ALIYUN_SMS_ACCESS_KEY_SECRET;
 
   if (!accessKeyId || !accessKeySecret) {
-    return { success: false, detail: `缺少阿里云凭证` };
+    return { success: false, detail: '缺少阿里云凭证' };
   }
 
   try {
@@ -33,10 +31,10 @@ async function sendSmsCode(phone: string): Promise<{ success: boolean; detail: s
       templateCode: process.env.ALIYUN_SMS_TEMPLATE_CODE || '100001',
       templateParam: '{"code":"##code##","min":"5"}',
       codeLength: 6,
-      codeType: 1, // 纯数字
-      returnVerifyCode: true, // 返回验证码明文
-      validTime: 300, // 5分钟有效
-      interval: 60, // 60秒间隔
+      codeType: 1,
+      returnVerifyCode: true,
+      validTime: 300,
+      interval: 60,
     });
 
     const runtime = new Util.RuntimeOptions({});
@@ -58,7 +56,7 @@ async function sendSmsCode(phone: string): Promise<{ success: boolean; detail: s
   }
 }
 
-async function verifySmsCode(phone: string, code: string, sessionId: string): Promise<{ success: boolean; detail: string }> {
+async function verifySmsCodeViaApi(phone: string, code: string, sessionId: string): Promise<{ success: boolean; detail: string }> {
   const accessKeyId = process.env.ALIYUN_SMS_ACCESS_KEY_ID;
   const accessKeySecret = process.env.ALIYUN_SMS_ACCESS_KEY_SECRET;
 
@@ -85,13 +83,13 @@ async function verifySmsCode(phone: string, code: string, sessionId: string): Pr
     const result = await client.checkSmsVerifyCodeWithOptions(checkReq, runtime);
 
     const resultCode = result.body?.code;
-    const resultMsg = result.body?.message;
+    const verifyResult = (result.body as any)?.model?.verifyResult;
 
-    if (resultCode === 'OK') {
+    if (resultCode === 'OK' && verifyResult === 'PASS') {
       return { success: true, detail: '验证通过' };
     }
 
-    return { success: false, detail: `验证失败: code=${resultCode}, message=${resultMsg}` };
+    return { success: false, detail: `验证失败: code=${resultCode}, verifyResult=${verifyResult}` };
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
     return { success: false, detail: `验证异常: ${errMsg.substring(0, 300)}` };
@@ -108,27 +106,45 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'send') {
-      // 60秒内不能重发
-      const existing = sessionStore.get(phone);
-      if (existing && existing.expires > Date.now() - 54000) {
+      const supabase = getSupabase();
+
+      // 检查60秒内是否已发过
+      const { data: recent } = await supabase
+        .from('sms_codes')
+        .select('created_at')
+        .eq('phone', phone)
+        .gte('created_at', new Date(Date.now() - 60000).toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (recent && recent.length > 0) {
         return NextResponse.json({ error: '发送太频繁，请60秒后再试' }, { status: 429 });
       }
 
+      // 调阿里云发短信
       const smsResult = await sendSmsCode(phone);
 
       if (!smsResult.success) {
         return NextResponse.json({ error: '验证码发送失败，请稍后重试', _debug: smsResult.detail }, { status: 500 });
       }
 
-      // 存sessionId用于后续验证
-      if (smsResult.sessionId) {
-        sessionStore.set(phone, { sessionId: smsResult.sessionId, expires: Date.now() + 300000 });
+      // 存到Supabase
+      const { error: insertErr } = await supabase
+        .from('sms_codes')
+        .insert({
+          phone,
+          code: smsResult.code || '',
+          session_id: smsResult.sessionId || '',
+          expires_at: new Date(Date.now() + 300000).toISOString(),
+        });
+
+      if (insertErr) {
+        console.error('[SMS] 存储验证码失败:', insertErr);
+        // 短信已发出，不阻拦
       }
 
-      // 如果dypns返回了验证码明文（returnVerifyCode=true），存下来作为备用验证方式
-      if (smsResult.code) {
-        sessionStore.set(phone + '_code', { sessionId: smsResult.code, expires: Date.now() + 300000 });
-      }
+      // 清理过期的验证码
+      await supabase.from('sms_codes').delete().lt('expires_at', new Date().toISOString());
 
       return NextResponse.json({ success: true, message: '验证码已发送' });
 
@@ -137,37 +153,48 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: '请输入6位验证码' }, { status: 400 });
       }
 
-      const stored = sessionStore.get(phone);
+      const supabase = getSupabase();
 
-      // 方案1：用dypns的CheckSmsVerifyCode验证
-      if (stored?.sessionId) {
-        const verifyResult = await verifySmsCode(phone, inputCode, stored.sessionId);
+      // 从Supabase查验证码记录
+      const { data: records } = await supabase
+        .from('sms_codes')
+        .select('*')
+        .eq('phone', phone)
+        .gte('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1);
 
-        if (verifyResult.success) {
-          sessionStore.delete(phone);
-          // 创建/查找用户，设置cookie
-          return await loginUser(phone);
-        }
-
-        // dypns验证失败，尝试本地备用验证
-        const localCode = sessionStore.get(phone + '_code');
-        if (localCode && localCode.sessionId === inputCode && localCode.expires > Date.now()) {
-          sessionStore.delete(phone);
-          sessionStore.delete(phone + '_code');
-          return await loginUser(phone);
-        }
-
-        return NextResponse.json({ error: '验证码错误或已过期', _debug: verifyResult.detail }, { status: 400 });
+      if (!records || records.length === 0) {
+        return NextResponse.json({ error: '验证码已过期，请重新获取' }, { status: 400 });
       }
 
-      // 方案2：本地备用验证
-      const localCode = sessionStore.get(phone + '_code');
-      if (localCode && localCode.sessionId === inputCode && localCode.expires > Date.now()) {
-        sessionStore.delete(phone + '_code');
+      const record = records[0];
+
+      // 方案1：用dypns的CheckSmsVerifyCode验证（有sessionId时）
+      if (record.session_id) {
+        const verifyResult = await verifySmsCodeViaApi(phone, inputCode, record.session_id);
+
+        if (verifyResult.success) {
+          await supabase.from('sms_codes').delete().eq('id', record.id);
+          return await loginUser(phone);
+        }
+
+        // dypns验证失败，尝试本地比対
+        if (record.code && record.code === inputCode) {
+          await supabase.from('sms_codes').delete().eq('id', record.id);
+          return await loginUser(phone);
+        }
+
+        return NextResponse.json({ error: '验证码错误', _debug: verifyResult.detail }, { status: 400 });
+      }
+
+      // 方案2：本地比對验证码
+      if (record.code && record.code === inputCode) {
+        await supabase.from('sms_codes').delete().eq('id', record.id);
         return await loginUser(phone);
       }
 
-      return NextResponse.json({ error: '验证码已过期，请重新获取' }, { status: 400 });
+      return NextResponse.json({ error: '验证码错误' }, { status: 400 });
 
     } else {
       return NextResponse.json({ error: '无效的操作' }, { status: 400 });
@@ -179,10 +206,10 @@ export async function POST(request: NextRequest) {
 }
 
 async function loginUser(phone: string) {
-  const { createClient } = await import('@supabase/supabase-js');
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
 
   // 查找或创建用户
   let { data: user } = await supabase
