@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
         plan_id: planId,
         amount: plan.price,
         status: 'pending',
+        title: `面试搭子 - ${plan.name}`,
       });
 
     if (orderError) {
@@ -65,27 +66,58 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '创建订单失败' }, { status: 500 });
     }
 
-    // 虎皮椒支付参数 - 强制使用www版本URL避免307重定向
+    // 虎皮椒支付参数 - 按官方API文档
+    // https://www.xunhupay.com/doc/api/pay.html
     const params: Record<string, string> = {
+      version: '1.1',
       appid: APP_ID,
-      out_trade_no: orderNo,
-      total_fee: (plan.price * 100).toFixed(0),
-      title: `面试搭子 - ${plan.name}`,
+      trade_order_id: orderNo,
+      total_fee: plan.price.toString(),
+      title: `面试搭子-${plan.name}`,
       time: Math.floor(Date.now() / 1000).toString(),
       notify_url: `${BASE_URL}/api/payment/callback`,
       return_url: `${BASE_URL}/payment/success?order=${orderNo}`,
+      nonce_str: crypto.randomBytes(8).toString('hex'),
     };
 
-    // 生成签名
+    // 生成hash签名：按参数名ASCII码升序排列，空值不参与，拼接key=secret
     const signStr = Object.keys(params)
+      .filter(key => params[key] !== '' && params[key] !== undefined)
       .sort()
       .map(key => `${key}=${params[key]}`)
-      .join('&') + APP_SECRET;
-    const sign = crypto.createHash('md5').update(signStr).digest('hex').toLowerCase();
+      .join('&') + `&key=${APP_SECRET}`;
+    
+    const hash = crypto.createHash('md5').update(signStr).digest('hex').toLowerCase();
 
-    const paymentUrl = `https://api.xunhupay.com/payment/do.html?${Object.entries(params)
-      .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
-      .join('&')}&sign=${sign}&sign_type=MD5`;
+    // 使用POST方式调用虎皮椒API，服务端代理请求
+    const formData = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) {
+      formData.append(k, v);
+    }
+    formData.append('hash', hash);
+
+    const xunhuRes = await fetch('https://api.xunhupay.com/payment/do.html', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formData.toString(),
+    });
+
+    const xunhuData = await xunhuRes.json();
+
+    if (xunhuData.errcode !== 0) {
+      console.error('XunhuPay error:', xunhuData);
+      return NextResponse.json({ 
+        error: `支付创建失败: ${xunhuData.errmsg || '未知错误'}` 
+      }, { status: 500 });
+    }
+
+    // 虎皮椒返回支付URL，跳转用户到该URL
+    const paymentUrl = xunhuData.url || xunhuData.url_qrcode;
+
+    if (!paymentUrl) {
+      console.error('No payment URL in xunhu response:', xunhuData);
+      return NextResponse.json({ error: '支付链接获取失败' }, { status: 500 });
+    }
 
     return NextResponse.json({
       success: true,
