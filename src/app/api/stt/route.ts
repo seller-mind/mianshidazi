@@ -1,13 +1,11 @@
 // STT API - 语音转文字
-// 使用硅基流动SenseVoiceSmall（免费）替代阿里云qwen3-asr-flash
-// 免费用户每日语音限额检查
+// 增加：免费用户每日语音限额检查
 
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { createClient } from '@supabase/supabase-js';
 
-const SILICONFLOW_API_KEY = process.env.SILICONFLOW_API_KEY;
-const SILICONFLOW_STT_URL = 'https://api.siliconflow.cn/v1/audio/transcriptions';
+const DASHSCOPE_API_KEY = process.env.DASHSCOPE_API_KEY;
 
 function getToken(request: NextRequest): string | null {
   let token = request.cookies.get('msd_token')?.value;
@@ -91,7 +89,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '登录已过期' }, { status: 401 });
   }
 
-  if (!SILICONFLOW_API_KEY) {
+  if (!DASHSCOPE_API_KEY) {
     return NextResponse.json({ error: 'STT未配置' }, { status: 500 });
   }
 
@@ -134,21 +132,44 @@ export async function POST(request: NextRequest) {
 
     console.log(`[STT] received audio: ${audioFile.name}, size=${audioFile.size}, type=${audioFile.type}`);
 
-    // 使用硅基流动SenseVoiceSmall（兼容OpenAI API格式）
-    const sttFormData = new FormData();
-    sttFormData.append('model', 'FunAudioLLM/SenseVoiceSmall');
-    sttFormData.append('file', audioFile);
+    const audioBuffer = await audioFile.arrayBuffer();
+    const base64Audio = Buffer.from(audioBuffer).toString('base64');
+
+    const mimeType = audioFile.type || 'audio/webm';
+    const dataUri = `data:${mimeType};base64,${base64Audio}`;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     try {
-      const response = await fetch(SILICONFLOW_STT_URL, {
+      const response = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${SILICONFLOW_API_KEY}`,
+          'Authorization': `Bearer ${DASHSCOPE_API_KEY}`,
+          'Content-Type': 'application/json',
         },
-        body: sttFormData,
+        body: JSON.stringify({
+          model: 'qwen3-asr-flash',
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'input_audio',
+                  input_audio: {
+                    data: dataUri,
+                  },
+                },
+              ],
+            },
+          ],
+          stream: false,
+          extra_body: {
+            asr_options: {
+              enable_itn: false,
+            },
+          },
+        }),
         signal: controller.signal,
       });
 
@@ -156,13 +177,12 @@ export async function POST(request: NextRequest) {
 
       if (!response.ok) {
         const errText = await response.text();
-        console.error('[STT] SiliconFlow API failed:', response.status, errText);
+        console.error('[STT] API failed:', response.status, errText);
         return NextResponse.json({ error: '语音识别服务异常' }, { status: 500 });
       }
 
       const data = await response.json();
-      // OpenAI兼容格式返回: { text: "..." }
-      const text = data.text?.trim() || '';
+      const text = data.choices?.[0]?.message?.content?.trim() || '';
 
       console.log(`[STT] result: "${text}"`);
 
