@@ -27,14 +27,12 @@ export default function CompanionPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState(() => generateId());
   const [context, setContext] = useState('日常');
-  const [pastSessions, setPastSessions] = useState<{ id: string; title: string; updated_at: string }[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(true);
-  const [showHistory, setShowHistory] = useState(false);
+  const [restoringHistory, setRestoringHistory] = useState(true); // 正在加载历史
   const { user: authUser } = useAuthContext();
 
   // 保存消息到Supabase
   const saveMessages = useCallback(async (msgs: Message[]) => {
-    if (msgs.length <= 1) return; // don't save just the welcome message
+    if (msgs.length <= 1) return;
     try {
       const token = localStorage.getItem('msd_token');
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -68,52 +66,72 @@ export default function CompanionPage() {
     }
   }, [sessionId]);
 
-  // 获取历史聊天记录
-  const fetchPastSessions = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('msd_token');
-      const headers: Record<string, string> = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch('/api/chat/sessions?type=companion', { headers });
-      if (res.ok) {
-        const data = await res.json();
-        setPastSessions((data.sessions || []).filter((s: any) => s.type === 'companion'));
-      }
-    } catch {
-      // ignore
-    } finally {
-      setLoadingHistory(false);
-    }
-  }, []);
-
-  // 恢复历史会话
-  const resumeSession = useCallback(async (session: { id: string; title: string }) => {
-    try {
-      const token = localStorage.getItem('msd_token');
-      const headers: Record<string, string> = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`/api/chat/messages?session_id=${session.id}`, { headers });
-      if (res.ok) {
-        const data = await res.json();
-        const msgs: Message[] = (data.messages || []).map((m: any) => ({
-          id: m.id,
-          role: m.role,
-          content: m.content,
-          isVoice: m.is_voice || false,
-        }));
-        setSessionId(session.id);
-        setMessages(msgs);
-        setShowHistory(false);
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  // 加载历史记录
+  // 自动保存消息到Supabase
   useEffect(() => {
-    fetchPastSessions();
-  }, [fetchPastSessions]);
+    if (messages.length > 1) {
+      saveMessages(messages);
+    }
+  }, [messages, saveMessages]);
+
+  // 进入页面时自动加载最近一次聊天记录
+  useEffect(() => {
+    (async () => {
+      try {
+        const token = localStorage.getItem('msd_token');
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const res = await fetch('/api/chat/sessions?type=companion', { headers });
+        if (res.ok) {
+          const data = await res.json();
+          const sessions = (data.sessions || []).filter((s: any) => s.type === 'companion');
+          if (sessions.length > 0) {
+            // 找到最近的一次聊天，加载消息
+            const latest = sessions[0];
+            const msgRes = await fetch(`/api/chat/messages?session_id=${latest.id}`, { headers });
+            if (msgRes.ok) {
+              const msgData = await msgRes.json();
+              const msgs: Message[] = (msgData.messages || []).map((m: any) => ({
+                id: m.id,
+                role: m.role,
+                content: m.content,
+                isVoice: m.is_voice || false,
+              }));
+              if (msgs.length > 0) {
+                setSessionId(latest.id);
+                setMessages(msgs);
+                setRestoringHistory(false);
+                return;
+              }
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+      // 没有历史记录，显示欢迎语
+      const hour = new Date().getHours();
+      let welcomeContext = '日常';
+      if (hour >= 0 && hour < 6) welcomeContext = '深夜';
+      setContext(welcomeContext);
+
+      const welcomeMessages: Message[] = [
+        {
+          id: 'welcome-1',
+          role: 'assistant',
+          content: '嗨，你来啦。我是阿搭，你的面试搭子。不管是面试前紧张、面试后崩溃、还是等通知等焦虑，都可以跟我说。我在这里。',
+        },
+      ];
+      if (welcomeContext === '深夜') {
+        welcomeMessages.push({
+          id: 'welcome-2',
+          role: 'assistant',
+          content: '这么晚还没睡？明天有面试吗？',
+        });
+      }
+      setMessages(welcomeMessages);
+      setRestoringHistory(false);
+    })();
+  }, []);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -122,40 +140,6 @@ export default function CompanionPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  // 自动保存消息到Supabase
-  useEffect(() => {
-    if (messages.length > 1) {
-      saveMessages(messages);
-    }
-  }, [messages, saveMessages]);
-
-  // 初始化欢迎消息（仅首次进入时）
-  const [initialized, setInitialized] = useState(false);
-  useEffect(() => {
-    if (initialized) return;
-    setInitialized(true);
-    const hour = new Date().getHours();
-    let welcomeContext = '日常';
-    if (hour >= 0 && hour < 6) welcomeContext = '深夜';
-    setContext(welcomeContext);
-
-    const welcomeMessages: Message[] = [
-      {
-        id: 'welcome-1',
-        role: 'assistant',
-        content: '嗨，你来啦。我是阿搭，你的面试搭子。不管是面试前紧张、面试后崩溃、还是等通知等焦虑，都可以跟我说。我在这里。',
-      },
-    ];
-    if (welcomeContext === '深夜') {
-      welcomeMessages.push({
-        id: 'welcome-2',
-        role: 'assistant',
-        content: '这么晚还没睡？明天有面试吗？',
-      });
-    }
-    setMessages(welcomeMessages);
-  }, [initialized]);
 
   // 发送消息给AI
   const sendToAI = useCallback(async (text: string, historyMessages: Message[]) => {
@@ -250,9 +234,8 @@ export default function CompanionPage() {
     };
 
     setMessages(prev => [...prev, voiceMessage]);
-    setIsLoading(true); // 立即显示三个点
+    setIsLoading(true);
 
-    // 后台STT
     (async () => {
       try {
         const res = await fetch(localUrl);
@@ -265,21 +248,19 @@ export default function CompanionPage() {
           const sttData = await sttRes.json();
           const transcript = sttData.text || '';
           if (transcript) {
-            // 更新语音消息的文字
             setMessages(prev => prev.map(msg =>
               msg.id === voiceId ? { ...msg, content: transcript } : msg
             ));
-            // 自动发给AI
             sendToAI(transcript, [...messages, { ...voiceMessage, content: transcript }]);
           } else {
-            setIsLoading(false); // STT没识别出文字也要关loading
+            setIsLoading(false);
           }
         } else {
-          setIsLoading(false); // STT请求失败也要关loading
+          setIsLoading(false);
         }
       } catch (err) {
         console.warn('[Voice] STT failed:', err);
-        setIsLoading(false); // STT异常也要关loading
+        setIsLoading(false);
       }
     })();
   }, [isLoading, messages, sendToAI]);
@@ -298,12 +279,30 @@ export default function CompanionPage() {
     }
   };
 
+  // 开始新对话
+  const startNewChat = () => {
+    setSessionId(generateId());
+    setMessages([{
+      id: 'welcome-new',
+      role: 'assistant',
+      content: '好的，新开一局。有什么想聊的？',
+    }]);
+  };
+
   const quickEntries = [
     { text: '面试前紧张', context: '面试前' },
     { text: '刚面试完', context: '面试后' },
     { text: '等通知焦虑', context: '等通知' },
     { text: '心情不好', context: '崩溃急救' },
   ];
+
+  if (restoringHistory) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#1A1A2E] to-[#252542] flex items-center justify-center">
+        <div className="animate-pulse text-gray-400 text-sm">加载中...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#1A1A2E] to-[#252542] flex flex-col">
@@ -317,9 +316,18 @@ export default function CompanionPage() {
               <p className="text-xs text-green-400">在线 · 随时都在</p>
             </div>
           </Link>
-          <Link href="/practice">
-            <Button variant="outline" size="sm" className="border-gray-600 text-gray-300 hover:text-white">去练习面试 →</Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={startNewChat}
+              className="px-3 py-1.5 border border-gray-600 text-gray-300 hover:text-white rounded-lg text-xs"
+            >
+              新对话
+            </button>
+            <Link href="/practice">
+              <Button variant="outline" size="sm" className="border-gray-600 text-gray-300 hover:text-white"
+                >去练习面试 →</Button>
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -346,44 +354,7 @@ export default function CompanionPage() {
         </div>
       </div>
 
-      {/* 历史记录列表 */}
-      {showHistory && (
-        <div className="flex-1 overflow-y-auto px-4 py-4">
-          <div className="max-w-2xl mx-auto">
-            {loadingHistory ? (
-              <p className="text-gray-400 text-sm text-center py-8">加载中...</p>
-            ) : pastSessions.length === 0 ? (
-              <p className="text-gray-400 text-sm text-center py-8">暂无历史记录</p>
-            ) : (
-              <div className="space-y-2">
-                {pastSessions.slice(0, 20).map((session) => {
-                  const date = new Date(session.updated_at);
-                  const dateStr = `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-                  return (
-                    <div
-                      key={session.id}
-                      onClick={() => resumeSession(session)}
-                      className="flex items-center gap-3 p-3 bg-[#2A2A45] rounded-xl cursor-pointer hover:bg-[#3A3A55] transition-colors"
-                    >
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF6B35] to-[#E55A28] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">搭</div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-200">{session.title || '阿搭聊天'}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">{dateStr}</p>
-                      </div>
-                      <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* 消息列表 */}
-      {!showHistory && (
       <div className="flex-1 overflow-y-auto px-4 py-4">
         <div className="max-w-2xl mx-auto space-y-4">
           <div className="text-xs text-gray-400 py-2 px-3 bg-[#3A3A55]/50 rounded-lg border border-amber-900/30 mb-4">
@@ -462,7 +433,6 @@ export default function CompanionPage() {
           <div ref={messagesEndRef} />
         </div>
       </div>
-      )}
 
       {/* 输入框 */}
       <div className="bg-[#252542] border-t border-gray-800 px-4 py-4">

@@ -37,18 +37,55 @@ function PracticeContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [interviewEnded, setInterviewEnded] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
-  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
-  const [pastSessions, setPastSessions] = useState<{ id: string; persona: string; title: string; updated_at: string }[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(true);
-  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
-  const [pastSessions, setPastSessions] = useState<{ id: string; persona: string; title: string; updated_at: string }[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(true);
   const [authChecking, setAuthChecking] = useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [restoringHistory, setRestoringHistory] = useState(true);
   const { user: authUser } = useAuthContext();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // TTS 语音播放
+  // TTS
   const { play, preload, isPlayingMessage, isLoadingMessage } = useTTS({ persona: selectedPersona || 'A' });
+
+  // 进入页面时自动加载最近一次面试
+  useEffect(() => {
+    (async () => {
+      try {
+        const token = localStorage.getItem('msd_token');
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const res = await fetch('/api/chat/sessions?type=interview', { headers });
+        if (res.ok) {
+          const data = await res.json();
+          const sessions = (data.sessions || []).filter((s: any) => s.type === 'interview');
+          if (sessions.length > 0) {
+            const latest = sessions[0];
+            const msgRes = await fetch(`/api/chat/messages?session_id=${latest.id}`, { headers });
+            if (msgRes.ok) {
+              const msgData = await msgRes.json();
+              const msgs: Message[] = (msgData.messages || []).map((m: any) => ({
+                id: m.id,
+                role: m.role,
+                content: m.content,
+                isVoice: m.is_voice || false,
+              }));
+              if (msgs.length > 0) {
+                setSessionId(latest.id);
+                setSelectedPersona(latest.persona as PersonaType);
+                setMessages(msgs);
+                setStep('interview');
+                setInterviewEnded(true); // 之前的面试已结束
+                setRestoringHistory(false);
+                return;
+              }
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+      setRestoringHistory(false);
+    })();
+  }, []);
 
   // 保存消息到Supabase
   const saveMessages = useCallback(async (msgs: Message[]) => {
@@ -58,7 +95,6 @@ function PracticeContent() {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
       
-      // Create/update session
       await fetch('/api/chat/sessions', {
         method: 'POST',
         headers,
@@ -70,7 +106,6 @@ function PracticeContent() {
         }),
       });
       
-      // Save messages
       await fetch('/api/chat/messages', {
         method: 'POST',
         headers,
@@ -89,68 +124,19 @@ function PracticeContent() {
     }
   }, [sessionId, selectedPersona]);
 
-  // 获取历史面试记录
-  const fetchPastSessions = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('msd_token');
-      const headers: Record<string, string> = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch('/api/chat/sessions?type=interview', { headers });
-      if (res.ok) {
-        const data = await res.json();
-        setPastSessions((data.sessions || []).filter((s: any) => s.type === 'interview'));
-      }
-    } catch {
-      // ignore
-    } finally {
-      setLoadingHistory(false);
-    }
-  }, []);
-
-  // 恢复历史会话
-  const resumeSession = useCallback(async (session: { id: string; persona: string }) => {
-    try {
-      const token = localStorage.getItem('msd_token');
-      const headers: Record<string, string> = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`/api/chat/messages?session_id=${session.id}`, { headers });
-      if (res.ok) {
-        const data = await res.json();
-        const msgs: Message[] = (data.messages || []).map((m: any) => ({
-          id: m.id,
-          role: m.role,
-          content: m.content,
-          isVoice: m.is_voice || false,
-        }));
-        setSessionId(session.id);
-        setSelectedPersona(session.persona as PersonaType);
-        setMessages(msgs);
-        setStep('interview');
-        setInterviewEnded(true); // 历史面试已结束，显示查看报告/再来一次
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  // 加载历史记录
-  useEffect(() => {
-    fetchPastSessions();
-  }, [fetchPastSessions]);
-
   // 滚动到底部
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // 自动保存消息到Supabase（每次消息变化时）
+  // 自动保存
   useEffect(() => {
     if (messages.length > 1 && selectedPersona) {
       saveMessages(messages);
     }
   }, [messages, saveMessages, selectedPersona]);
 
-  // 预加载语音：AI回复过程中就预加载（内容hash变化会自动重载）
+  // 预加载语音
   useEffect(() => {
     messages.forEach(msg => {
       if (msg.role === 'assistant' && msg.content && msg.content.length > 10) {
@@ -159,20 +145,18 @@ function PracticeContent() {
     });
   }, [messages, preload]);
 
-  // 开始面试（带权益检查）
+  // 开始面试
   const startInterview = async () => {
     if (!selectedPersona) return;
     
     setAuthChecking(true);
     try {
-      // 1. 检查登录状态
       const token = typeof window !== 'undefined' ? localStorage.getItem('msd_token') : null;
       const authHeaders: Record<string, string> = {};
       if (token) authHeaders['Authorization'] = `Bearer ${token}`;
 
       const meRes = await fetch('/api/auth/me', { redirect: 'follow', credentials: 'include', headers: authHeaders });
       if (meRes.redirected) {
-        // 被重定向说明session丢失，跳转登录
         router.push('/login');
         setAuthChecking(false);
         return;
@@ -184,52 +168,31 @@ function PracticeContent() {
         return;
       }
 
-      // 2. 检查订阅权益
       const subRes = await fetch('/api/subscription/check', { redirect: 'follow', credentials: 'include', headers: authHeaders });
       const subData = await subRes.json();
       
       if (!subData.canPractice) {
-        // 无权益，显示付费引导
         setShowPaywall(true);
         setAuthChecking(false);
         return;
       }
 
-      // 3. 扣减面试次数（免费体验和单次套餐需要扣）
       if (subData.plan === 'free' || subData.plan === 'single') {
         await fetch('/api/subscription/check', { method: 'POST', redirect: 'follow', credentials: 'include', headers: authHeaders });
       }
 
-      // 4. 通过检查，开始面试
       setStep('interview');
       
-      // 开场白
       let intro = '';
       switch (selectedPersona) {
-        case 'A':
-          intro = '你好呀，今天来做一次轻松的面试练习。准备好了吗？';
-          break;
-        case 'B':
-          intro = '你好，请坐。从自我介绍开始吧，1-2分钟。';
-          break;
-        case 'C':
-          intro = '嗯，开始吧。一分钟自我介绍，说重点。';
-          break;
-        case 'D':
-          intro = '行，开始。自我介绍，说重点，别废话。';
-          break;
-        case 'E':
-          intro = '你好，先自我介绍一下吧。对了，我们公司发展空间很大，机会很多。';
-          break;
+        case 'A': intro = '你好呀，今天来做一次轻松的面试练习。准备好了吗？'; break;
+        case 'B': intro = '你好，请坐。从自我介绍开始吧，1-2分钟。'; break;
+        case 'C': intro = '嗯，开始吧。一分钟自我介绍，说重点。'; break;
+        case 'D': intro = '行，开始。自我介绍，说重点，别废话。'; break;
+        case 'E': intro = '你好，先自我介绍一下吧。对了，我们公司发展空间很大，机会很多。'; break;
       }
 
-      setMessages([
-        {
-          id: generateId(),
-          role: 'assistant',
-          content: intro,
-        },
-      ]);
+      setMessages([{ id: generateId(), role: 'assistant', content: intro }]);
     } catch {
       router.push('/login');
     } finally {
@@ -242,12 +205,7 @@ function PracticeContent() {
     const msgText = text || input.trim();
     if (!msgText || isLoading || !selectedPersona) return;
 
-    const userMessage: Message = {
-      id: generateId(),
-      role: 'user',
-      content: msgText,
-    };
-
+    const userMessage: Message = { id: generateId(), role: 'user', content: msgText };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
@@ -265,14 +223,8 @@ function PracticeContent() {
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('发送失败');
-      }
-
-      // 处理SSE流式响应
-      if (!response.body) {
-        throw new Error('响应体为空，请稍后重试');
-      }
+      if (!response.ok) throw new Error('发送失败');
+      if (!response.body) throw new Error('响应体为空');
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -284,101 +236,63 @@ function PracticeContent() {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-
         const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
+        for (const line of chunk.split('\n')) {
           if (line.startsWith('data: ')) {
             const data = line.slice(6);
             if (data === '[DONE]') {
-              // 检查是否有错误
               if (!assistantMessage.trim()) {
-                setMessages(prev =>
-                  prev.map(msg =>
-                    msg.id === assistantId
-                      ? { ...msg, content: '抱歉，暂时无法回复，请稍后重试。' }
-                      : msg
-                  )
-                );
+                setMessages(prev => prev.map(msg =>
+                  msg.id === assistantId ? { ...msg, content: '抱歉，暂时无法回复，请稍后重试。' } : msg
+                ));
               }
               break;
             }
             try {
               const parsed = JSON.parse(data);
-              // 处理错误响应
               if (parsed.error) {
-                setMessages(prev =>
-                  prev.map(msg =>
-                    msg.id === assistantId
-                      ? { ...msg, content: `出错了: ${parsed.error}` }
-                      : msg
-                  )
-                );
+                setMessages(prev => prev.map(msg =>
+                  msg.id === assistantId ? { ...msg, content: `出错了: ${parsed.error}` } : msg
+                ));
                 break;
               }
               if (parsed.content) {
                 assistantMessage += parsed.content;
-                setMessages(prev =>
-                  prev.map(msg =>
-                    msg.id === assistantId
-                      ? { ...msg, content: assistantMessage }
-                      : msg
-                  )
-                );
+                setMessages(prev => prev.map(msg =>
+                  msg.id === assistantId ? { ...msg, content: assistantMessage } : msg
+                ));
               }
-            } catch {
-              // 忽略解析错误
-            }
+            } catch {}
           }
         }
       }
     } catch (error) {
-      console.error('发送消息失败:', error);
-      setMessages(prev => [
-        ...prev,
-        { id: generateId(), role: 'assistant', content: `抱歉，出了点问题: ${error instanceof Error ? error.message : '请稍后重试'}` },
-      ]);
+      setMessages(prev => [...prev, { id: generateId(), role: 'assistant', content: `抱歉，出了点问题: ${error instanceof Error ? error.message : '请稍后重试'}` }]);
     } finally {
       setIsLoading(false);
     }
   }, [input, isLoading, selectedPersona, sessionId, tensionType, messages]);
 
-
-
   // 结束面试
   const endInterview = () => {
     if (!selectedPersona) return;
-
     let endMessage = '';
     switch (selectedPersona) {
-      case 'A':
-        endMessage = '练习结束，你做得很棒！我会在最后给你一份详细反馈。';
-        break;
-      case 'B':
-        endMessage = '好，今天的面试到这里。你有什么问题想问我吗？';
-        break;
-      case 'C':
-        endMessage = '今天的面试到此结束。你还有什么想补充的吗？';
-        break;
-      case 'D':
-        endMessage = '好了，你知道自己问题在哪了吗？刚那几个点比较犀利，但真实面试官没我毒。你能扛住我，就能扛住他们。';
-        break;
-      case 'E':
-        endMessage = '好，今天的面试结束了。我们会在一周内通知你。';
-        break;
+      case 'A': endMessage = '练习结束，你做得很棒！我会在最后给你一份详细反馈。'; break;
+      case 'B': endMessage = '好，今天的面试到这里。你有什么问题想问我吗？'; break;
+      case 'C': endMessage = '今天的面试到此结束。你还有什么想补充的吗？'; break;
+      case 'D': endMessage = '好了，你知道自己问题在哪了吗？刚那几个点比较犀利，但真实面试官没我毒。你能扛住我，就能扛住他们。'; break;
+      case 'E': endMessage = '好，今天的面试结束了。我们会在一周内通知你。'; break;
     }
-
     setMessages(prev => [...prev, { id: generateId(), role: 'assistant', content: endMessage }]);
     setInterviewEnded(true);
   };
 
-  // 生成报告并跳转
+  // 生成报告
   const goToReport = async () => {
-    if (isGeneratingReport) return; // 防止重复点击
+    if (isGeneratingReport) return;
     setIsGeneratingReport(true);
     try {
-      // 调用报告生成API
       const res = await fetch('/api/report/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -390,13 +304,11 @@ function PracticeContent() {
       if (res.ok) {
         const data = await res.json();
         if (data.data) {
-          // 存到localStorage供报告页读取
           localStorage.setItem('msd_report', JSON.stringify(data.data));
           window.location.href = '/report';
           return;
         }
       }
-      // API失败也跳转，报告页会处理空数据
       window.location.href = '/report';
     } catch {
       window.location.href = '/report';
@@ -405,7 +317,7 @@ function PracticeContent() {
     }
   };
 
-  // 语音发送：立即显示气泡，后台STT+AI
+  // 语音发送
   const handleVoiceSend = useCallback((localUrl: string, durationMs: number) => {
     if (isLoading || !selectedPersona) return;
 
@@ -420,9 +332,8 @@ function PracticeContent() {
     };
 
     setMessages(prev => [...prev, voiceMessage]);
-    setIsLoading(true); // 立即显示三个点，不让用户以为卡了
+    setIsLoading(true);
 
-    // 后台STT
     (async () => {
       try {
         const res = await fetch(localUrl);
@@ -438,7 +349,6 @@ function PracticeContent() {
             setMessages(prev => prev.map(msg =>
               msg.id === voiceId ? { ...msg, content: transcript } : msg
             ));
-            // 发给AI
             try {
               const response = await fetch('/api/chat/interview', {
                 method: 'POST',
@@ -482,43 +392,35 @@ function PracticeContent() {
                           msg.id === assistantId ? { ...msg, content: assistantMessage } : msg
                         ));
                       }
-                    } catch { /* ignore */ }
+                    } catch {}
                   }
                 }
               }
             } catch (error) {
-              setMessages(prev => [...prev, {
-                id: generateId(), role: 'assistant',
-                content: `抱歉，出了点问题: ${error instanceof Error ? error.message : '请稍后重试'}`,
-              }]);
+              setMessages(prev => [...prev, { id: generateId(), role: 'assistant', content: `抱歉，出了点问题: ${error instanceof Error ? error.message : '请稍后重试'}` }]);
             } finally {
               setIsLoading(false);
             }
           } else {
-            setIsLoading(false); // STT没识别出文字也要关loading
+            setIsLoading(false);
           }
         } else {
-          setIsLoading(false); // STT请求失败也要关loading
+          setIsLoading(false);
         }
       } catch (err) {
         console.warn('[Voice] STT failed:', err);
-        setIsLoading(false); // STT失败也要关loading
+        setIsLoading(false);
       }
     })();
   }, [isLoading, selectedPersona, sessionId, tensionType, messages]);
 
   // 语音转文字
   const handleVoiceTranscript = useCallback((messageId: string, text: string) => {
-    setMessages(prev =>
-      prev.map(msg =>
-        msg.id === messageId
-          ? { ...msg, voiceTranscript: text }
-          : msg
-      )
-    );
+    setMessages(prev => prev.map(msg =>
+      msg.id === messageId ? { ...msg, voiceTranscript: text } : msg
+    ));
   }, []);
 
-  // 键盘发送
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -532,52 +434,41 @@ function PracticeContent() {
       <main className="min-h-screen bg-gradient-to-b from-white to-orange-50 dark:from-[#1A1A2E] dark:to-[#252542] py-8 px-6">
         <div className="max-w-md mx-auto text-center">
           <div className="text-6xl mb-6">🎯</div>
-          <h2 className="text-2xl font-bold text-[#1F2937] dark:text-white mb-3">
-            免费体验已用完
-          </h2>
-          <p className="text-[#6B7280] dark:text-gray-400 mb-8">
-            你已经体验过一次模拟面试啦！解锁更多练习，让面试紧张不再拖后腿。
-          </p>
+          <h2 className="text-2xl font-bold text-[#1F2937] dark:text-white mb-3">免费体验已用完</h2>
+          <p className="text-[#6B7280] dark:text-gray-400 mb-8">你已经体验过一次模拟面试啦！解锁更多练习，让面试紧张不再拖后腿。</p>
           <div className="space-y-3">
-            <Link href="/pricing" className="block w-full py-3 bg-[#FF6B35] text-white rounded-xl font-medium text-lg hover:bg-[#E55A28] transition-colors">
-              查看套餐 →
-            </Link>
-            <button
-              onClick={() => setShowPaywall(false)}
-              className="block w-full py-3 text-[#6B7280] hover:text-[#1F2937] dark:hover:text-white transition-colors"
-            >
-              返回
-            </button>
+            <Link href="/pricing" className="block w-full py-3 bg-[#FF6B35] text-white rounded-xl font-medium text-lg hover:bg-[#E55A28] transition-colors">查看套餐 →</Link>
+            <button onClick={() => setShowPaywall(false)} className="block w-full py-3 text-[#6B7280] hover:text-[#1F2937] dark:hover:text-white transition-colors">返回</button>
           </div>
         </div>
       </main>
     );
   }
 
-  // 步骤1：选择人格
+  // 加载历史中
+  if (restoringHistory) {
+    return (
+      <main className="min-h-screen bg-gradient-to-b from-white to-orange-50 dark:from-[#1A1A2E] dark:to-[#252542] py-8 px-6">
+        <div className="max-w-2xl mx-auto text-center">
+          <div className="animate-pulse text-gray-400">加载中...</div>
+        </div>
+      </main>
+    );
+  }
+
+  // 选择人格
   if (step === 'select') {
     return (
       <main className="min-h-screen bg-gradient-to-b from-white to-orange-50 dark:from-[#1A1A2E] dark:to-[#252542] py-8 px-6">
         <div className="max-w-2xl mx-auto">
-          {/* 返回按钮 */}
           <Link href="/" className="inline-flex items-center gap-2 text-[#6B7280] hover:text-[#FF6B35] transition-colors mb-8">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             返回
           </Link>
-
-          {/* 标题 */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-[#1F2937] dark:text-white mb-4">
-              选择你的面试官
-            </h1>
-            <p className="text-[#6B7280] dark:text-gray-400">
-              不同风格的面试官，帮你应对不同场景
-            </p>
+            <h1 className="text-3xl font-bold text-[#1F2937] dark:text-white mb-4">选择你的面试官</h1>
+            <p className="text-[#6B7280] dark:text-gray-400">不同风格的面试官，帮你应对不同场景</p>
           </div>
-
-          {/* 人格选择 */}
           <div className="space-y-4">
             {(Object.entries(PERSONA_CONFIGS) as [PersonaType, typeof PERSONA_CONFIGS['A']][]).map(([key, config]) => (
               <Card
@@ -589,128 +480,61 @@ function PracticeContent() {
                 <div className="flex items-start gap-4">
                   <span className="text-3xl">{config.emoji}</span>
                   <div className="flex-1">
-                    <h3 className="font-semibold text-[#1F2937] dark:text-white mb-1">
-                      {config.name}
-                    </h3>
-                    <p className="text-sm text-[#6B7280] dark:text-gray-400 mb-2">
-                      {config.description}
-                    </p>
+                    <h3 className="font-semibold text-[#1F2937] dark:text-white mb-1">{config.name}</h3>
+                    <p className="text-sm text-[#6B7280] dark:text-gray-400 mb-2">{config.description}</p>
                     <div className="flex flex-wrap gap-2">
                       {config.suitableFor.map((tag) => (
-                        <span
-                          key={tag}
-                          className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs rounded-full"
-                        >
-                          {tag}
-                        </span>
+                        <span key={tag} className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs rounded-full">{tag}</span>
                       ))}
                     </div>
-                    {config.warning && (
-                      <p className="text-xs text-red-500 mt-2">{config.warning}</p>
-                    )}
+                    {config.warning && <p className="text-xs text-red-500 mt-2">{config.warning}</p>}
                   </div>
                   {selectedPersona === key && (
                     <div className="w-6 h-6 rounded-full bg-[#FF6B35] flex items-center justify-center">
-                      <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
+                      <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                     </div>
                   )}
                 </div>
               </Card>
             ))}
           </div>
-
-          {/* 开始按钮 */}
           <div className="mt-8">
-            <Button
-              size="lg"
-              className="w-full"
-              disabled={!selectedPersona || authChecking}
-              onClick={startInterview}
-            >
+            <Button size="lg" className="w-full" disabled={!selectedPersona || authChecking} onClick={startInterview}>
               {authChecking ? '检查权益中...' : selectedPersona ? `开始 ${PERSONA_CONFIGS[selectedPersona].name}` : '请先选择面试官'}
             </Button>
           </div>
-
-          {/* 历史面试记录 */}
-          {pastSessions.length > 0 && (
-            <div className="mt-8">
-              <h2 className="text-lg font-semibold text-[#1F2937] dark:text-white mb-4">历史面试</h2>
-              <div className="space-y-2">
-                {pastSessions.slice(0, 10).map((session) => {
-                  const personaInfo = PERSONA_CONFIGS[session.persona as PersonaType];
-                  const date = new Date(session.updated_at);
-                  const dateStr = `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-                  return (
-                    <div
-                      key={session.id}
-                      onClick={() => resumeSession(session)}
-                      className="flex items-center gap-3 p-3 bg-white dark:bg-[#252542] rounded-xl border border-gray-100 dark:border-gray-800 cursor-pointer hover:border-[#FF6B35] transition-colors"
-                    >
-                      <span className="text-2xl">{personaInfo?.emoji || '🎯'}</span>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-[#1F2937] dark:text-white">{session.title || personaInfo?.name || '模拟面试'}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{dateStr}</p>
-                      </div>
-                      <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
       </main>
     );
   }
 
-  // 步骤2：面试中
+  // 面试中
   return (
     <main className="min-h-screen bg-white dark:bg-[#1A1A2E] flex flex-col">
-      {/* 顶部栏 */}
       <header className="bg-white dark:bg-[#252542] border-b border-gray-100 dark:border-gray-800 px-6 py-4">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="text-2xl">{selectedPersona && PERSONA_CONFIGS[selectedPersona]?.emoji}</span>
             <div>
-              <p className="font-medium text-[#1F2937] dark:text-white">
-                {selectedPersona && PERSONA_CONFIGS[selectedPersona]?.name}
-              </p>
-              <p className="text-xs text-gray-500">
-                AI模拟面试中
-              </p>
+              <p className="font-medium text-[#1F2937] dark:text-white">{selectedPersona && PERSONA_CONFIGS[selectedPersona]?.name}</p>
+              <p className="text-xs text-gray-500">AI模拟面试中</p>
             </div>
           </div>
           {!interviewEnded && (
-            <Button variant="ghost" size="sm" onClick={endInterview}>
-              结束面试
-            </Button>
+            <Button variant="ghost" size="sm" onClick={endInterview}>结束面试</Button>
           )}
         </div>
       </header>
 
-      {/* 消息区域 */}
       <div className="flex-1 overflow-y-auto px-6 py-4">
         <div className="max-w-2xl mx-auto space-y-4">
-          {/* AI内容标识 - 根据《人工智能生成合成内容标识办法》 */}
           <div className="text-xs text-gray-500 dark:text-gray-400 py-2 px-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800 mb-4">
-            <div className="flex items-center gap-2 mb-1">
-              <AIBadge />
-              <span>根据《人工智能生成合成内容标识办法》标注</span>
-            </div>
-            <p className="leading-relaxed">
-              本对话内容由AI生成，仅供参考。AI提供的面试建议不构成专业职业指导或心理治疗建议。
-            </p>
+            <div className="flex items-center gap-2 mb-1"><AIBadge /><span>根据《人工智能生成合成内容标识办法》标注</span></div>
+            <p className="leading-relaxed">本对话内容由AI生成，仅供参考。AI提供的面试建议不构成专业职业指导或心理治疗建议。</p>
           </div>
           
           {messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-start gap-2`}
-            >
+            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-start gap-2`}>
               {msg.role === 'assistant' && (
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF6B35] to-[#E55A28] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">搭</div>
               )}
@@ -732,26 +556,14 @@ function PracticeContent() {
                       isUser={msg.role === 'user'}
                       onTranscript={msg.voiceTranscript ? undefined : (text) => handleVoiceTranscript(msg.id, text)}
                     />
-                    {msg.voiceTranscript && (
-                      <p className="text-xs text-gray-400 max-w-[85%] px-2">
-                        {msg.voiceTranscript}
-                      </p>
-                    )}
+                    {msg.voiceTranscript && <p className="text-xs text-gray-400 max-w-[85%] px-2">{msg.voiceTranscript}</p>}
                   </div>
                 ) : (
                 <div
-                  className={`px-4 py-3 rounded-2xl ${
-                    msg.role === 'user'
-                      ? 'bg-[#FF6B35] text-white rounded-tr-md'
-                      : 'bg-gray-100 dark:bg-[#2A2A45] text-[#1F2937] dark:text-gray-100 rounded-tl-md'
-                  }`}
+                  className={`px-4 py-3 rounded-2xl ${msg.role === 'user' ? 'bg-[#FF6B35] text-white rounded-tr-md' : 'bg-gray-100 dark:bg-[#2A2A45] text-[#1F2937] dark:text-gray-100 rounded-tl-md'}`}
                   style={{ whiteSpace: 'pre-wrap' }}
                 >
-                  {msg.role === 'assistant' && (
-                    <div className="flex items-center gap-1 mb-1">
-                      <AIBadge />
-                    </div>
-                  )}
+                  {msg.role === 'assistant' && <div className="flex items-center gap-1 mb-1"><AIBadge /></div>}
                   {msg.content}
                 </div>
                 )}
@@ -780,20 +592,15 @@ function PracticeContent() {
               </div>
             </div>
           )}
-          
           <div ref={messagesEndRef} />
         </div>
       </div>
-
-
 
       {/* 底部操作区 */}
       {interviewEnded ? (
         <div className="bg-green-50 dark:bg-green-900/20 border-t border-green-200 dark:border-green-800 px-6 py-4">
           <div className="max-w-2xl mx-auto text-center">
-            <p className="text-green-700 dark:text-green-400 text-sm mb-3">
-              面试结束！恭喜你完成了一次练习
-            </p>
+            <p className="text-green-700 dark:text-green-400 text-sm mb-3">面试结束！恭喜你完成了一次练习</p>
             <div className="flex gap-3 justify-center">
               <Button onClick={goToReport} disabled={isGeneratingReport}>
                 {isGeneratingReport ? '正在生成报告...' : '查看面试报告 →'}
@@ -807,14 +614,9 @@ function PracticeContent() {
       ) : (
         <footer className="bg-white dark:bg-[#252542] border-t border-gray-100 dark:border-gray-800 px-4 py-3">
           <div className="max-w-2xl mx-auto">
-            {/* 语音输入 - 主交互方式 */}
             <div className="flex items-center justify-center mb-2">
-              <VoiceInput
-                onVoiceSend={handleVoiceSend}
-                disabled={isLoading}
-              />
+              <VoiceInput onVoiceSend={handleVoiceSend} disabled={isLoading} />
             </div>
-            {/* 文字输入 - 辅助 */}
             <div className="flex gap-2 items-center">
               <input
                 value={input}
@@ -824,20 +626,9 @@ function PracticeContent() {
                 className="flex-1 px-3 py-2 bg-gray-100 dark:bg-[#1A1A2E] rounded-lg text-sm text-[#1F2937] dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-[#FF6B35]"
               />
               {input.trim() && (
-                <button
-                  onClick={() => sendMessage()}
-                  disabled={isLoading}
-                  className="px-3 py-2 bg-[#FF6B35] text-white rounded-lg text-sm font-medium active:scale-95 transition-transform"
-                >
-                  发送
-                </button>
+                <button onClick={() => sendMessage()} disabled={isLoading} className="px-3 py-2 bg-[#FF6B35] text-white rounded-lg text-sm font-medium active:scale-95 transition-transform">发送</button>
               )}
-              <button
-                onClick={endInterview}
-                className="px-3 py-2 text-xs text-gray-400 hover:text-[#FF6B35] transition-colors"
-              >
-                结束面试
-              </button>
+              <button onClick={endInterview} className="px-3 py-2 text-xs text-gray-400 hover:text-[#FF6B35] transition-colors">结束面试</button>
             </div>
           </div>
         </footer>
@@ -852,8 +643,8 @@ export default function PracticePage() {
       <main className="min-h-screen bg-gradient-to-b from-white to-orange-50 dark:from-[#1A1A2E] dark:to-[#252542] py-8 px-6">
         <div className="max-w-2xl mx-auto text-center">
           <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mx-auto mb-4"></div>
-            <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mx-auto mb-4" />
+            <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded" />
           </div>
         </div>
       </main>
