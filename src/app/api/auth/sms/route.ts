@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// 内存验证码存储
 const codeStore = new Map<string, { code: string; expires: number }>();
 
-// 清理过期验证码
 setInterval(() => {
   const now = Date.now();
   for (const [key, value] of codeStore) {
@@ -11,86 +9,57 @@ setInterval(() => {
   }
 }, 60000);
 
-async function sendSmsViaDypns(phone: string, code: string): Promise<boolean> {
+async function sendSmsViaDypns(phone: string, code: string): Promise<{ success: boolean; detail: string }> {
   const accessKeyId = process.env.ALIYUN_SMS_ACCESS_KEY_ID;
   const accessKeySecret = process.env.ALIYUN_SMS_ACCESS_KEY_SECRET;
-  const signName = process.env.ALIYUN_SMS_SIGN_NAME;
-  const templateCode = process.env.ALIYUN_SMS_TEMPLATE_CODE;
 
   if (!accessKeyId || !accessKeySecret) {
-    console.log(`[DEV] SMS not configured, code for ${phone}: ${code}`);
-    return false;
+    return { success: false, detail: `缺少阿里云凭证: id=${!!accessKeyId}, secret=${!!accessKeySecret}` };
   }
 
   try {
-    // 优先使用 dypns（短信认证服务，无需资质审核）
     const Dypnsapi = await import('@alicloud/dypnsapi20170525');
     const OpenApi = await import('@alicloud/openapi-client');
     const Util = await import('@alicloud/tea-util');
 
-    const config = new OpenApi.Config({
-      accessKeyId,
-      accessKeySecret,
-    });
-    // dypns 的 endpoint
+    const config = new OpenApi.Config({ accessKeyId, accessKeySecret });
     config.endpoint = 'dypnsapi.aliyuncs.com';
     const client = new Dypnsapi.default(config);
 
-    // 使用 SendSms 接口
     const sendReq = new Dypnsapi.SendSmsRequest({
       phoneNumber: phone,
-      signName: signName || '速通互联验证码',
-      templateCode: templateCode || '100001',
+      signName: process.env.ALIYUN_SMS_SIGN_NAME || '速通互联验证码',
+      templateCode: process.env.ALIYUN_SMS_TEMPLATE_CODE || '100001',
       templateParam: JSON.stringify({ code, min: '5' }),
     });
 
     const runtime = new Util.RuntimeOptions({});
     const result = await client.sendSmsWithOptions(sendReq, runtime);
 
-    console.log(`[SMS-DYPNS] Send to ${phone}, code=${result.body?.code}, message=${result.body?.message}`);
-    return result.body?.code === 'OK';
-  } catch (dypnsError) {
-    console.error('[SMS-DYPNS] Error, falling back to dysms:', dypnsError);
+    const resultCode = result.body?.code;
+    const resultMsg = result.body?.message;
 
-    // fallback 到 dysms
-    try {
-      const Dysmsapi = await import('@alicloud/dysmsapi20170525');
-      const OpenApi = await import('@alicloud/openapi-client');
-      const Util = await import('@alicloud/tea-util');
-
-      const config = new OpenApi.Config({ accessKeyId, accessKeySecret });
-      config.endpoint = 'dysmsapi.aliyuncs.com';
-      const client = new Dysmsapi.default(config);
-
-      const sendReq = new Dysmsapi.SendSmsRequest({
-        phoneNumbers: phone,
-        signName: signName || '速通互联验证码',
-        templateCode: templateCode || '100001',
-        templateParam: JSON.stringify({ code, min: '5' }),
-      });
-
-      const runtime = new Util.RuntimeOptions({});
-      const result = await client.sendSmsWithOptions(sendReq, runtime);
-
-      console.log(`[SMS-DYSMS] Send to ${phone}, code=${result.body?.code}, message=${result.body?.message}`);
-      return result.body?.code === 'OK';
-    } catch (dysmsError) {
-      console.error('[SMS-DYSMS] Error:', dysmsError);
-      return false;
+    if (resultCode === 'OK') {
+      return { success: true, detail: '发送成功' };
     }
+
+    return { success: false, detail: `dypns返回: code=${resultCode}, message=${resultMsg}` };
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    return { success: false, detail: `dypns异常: ${errMsg.substring(0, 200)}` };
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { phone, action, code: inputCode } = await request.json();
+    const body = await request.json();
+    const { phone, action, code: inputCode } = body;
 
     if (!phone || !/^1[3-9]\d{9}$/.test(phone)) {
       return NextResponse.json({ error: '手机号格式不正确' }, { status: 400 });
     }
 
     if (action === 'send') {
-      // 频率限制
       const existing = codeStore.get(phone);
       if (existing && existing.expires > Date.now() - 54000) {
         return NextResponse.json({ error: '发送太频繁，请60秒后再试' }, { status: 429 });
@@ -99,10 +68,17 @@ export async function POST(request: NextRequest) {
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       codeStore.set(phone, { code, expires: Date.now() + 300000 });
 
-      const smsSuccess = await sendSmsViaDypns(phone, code);
+      const smsResult = await sendSmsViaDypns(phone, code);
 
-      if (!smsSuccess) {
-        console.log(`[DEV] Fallback - SMS code for ${phone}: ${code}`);
+      if (!smsResult.success) {
+        console.log(`[SMS] 发送失败: ${smsResult.detail}, 验证码: ${code}`);
+        // 即使短信没发出去也存验证码，方便调试
+        return NextResponse.json({
+          success: true,
+          message: '验证码已发送',
+          _debug: smsResult.detail,
+          _code: process.env.NODE_ENV === 'development' ? code : undefined,
+        });
       }
 
       return NextResponse.json({ success: true, message: '验证码已发送' });
@@ -120,26 +96,42 @@ export async function POST(request: NextRequest) {
       codeStore.delete(phone);
 
       // 查找或创建用户
-      const { createAdminClient } = await import('@/lib/supabase/admin');
-      const supabase = createAdminClient();
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      const jwtSecret = process.env.JWT_SECRET;
 
-      let { data: user } = await supabase.from('users').select('*').eq('phone', phone).single();
+      if (!supabaseUrl || !serviceRoleKey || !jwtSecret) {
+        return NextResponse.json({
+          error: '服务器配置缺失',
+          debug: { hasUrl: !!supabaseUrl, hasKey: !!serviceRoleKey, hasJwt: !!jwtSecret },
+        }, { status: 500 });
+      }
+
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(supabaseUrl, serviceRoleKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+
+      let { data: user, error: userError } = await supabase
+        .from('users').select('*').eq('phone', phone).single();
 
       if (!user) {
-        const { data: newUser, error } = await supabase
+        const { data: newUser, error: insertError } = await supabase
           .from('users').insert({ phone }).select().single();
-        if (error) {
-          console.error('Create user error:', error);
-          return NextResponse.json({ error: '创建用户失败' }, { status: 500 });
+
+        if (insertError || !newUser) {
+          return NextResponse.json({
+            error: '创建用户失败',
+            debug: { code: insertError?.code, message: insertError?.message },
+          }, { status: 500 });
         }
         user = newUser;
       }
 
-      // 生成JWT
       const jwt = await import('jsonwebtoken');
       const token = jwt.sign(
         { userId: user.id, phone: user.phone, email: user.email },
-        process.env.JWT_SECRET!,
+        jwtSecret,
         { expiresIn: '30d' }
       );
 
@@ -161,7 +153,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   } catch (error) {
-    console.error('Auth SMS error:', error);
-    return NextResponse.json({ error: '服务器错误' }, { status: 500 });
+    const errMsg = error instanceof Error ? error.message : '未知错误';
+    return NextResponse.json({ error: '服务器错误', debug: errMsg }, { status: 500 });
   }
 }
