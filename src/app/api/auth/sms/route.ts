@@ -12,33 +12,43 @@ setInterval(() => {
 }, 60000);
 
 async function sendSms(phone: string, code: string): Promise<boolean> {
+  const accessKeyId = process.env.ALIYUN_SMS_ACCESS_KEY_ID;
+  const accessKeySecret = process.env.ALIYUN_SMS_ACCESS_KEY_SECRET;
+  const signName = process.env.ALIYUN_SMS_SIGN_NAME;
+  const templateCode = process.env.ALIYUN_SMS_TEMPLATE_CODE;
+
+  // 没配置则走开发模式
+  if (!accessKeyId || !accessKeySecret || !signName || !templateCode) {
+    console.log(`[DEV] SMS not configured, code for ${phone}: ${code}`);
+    return false;
+  }
+
   try {
-    const Dysmsapi = await import('@alicloud/dypnsapi20170525');
+    const Dysmsapi20170525 = await import('@alicloud/dysmsapi20170525');
     const OpenApi = await import('@alicloud/openapi-client');
     const Util = await import('@alicloud/tea-util');
 
     const config = new OpenApi.Config({
-      accessKeyId: process.env.ALIYUN_SMS_ACCESS_KEY_ID!,
-      accessKeySecret: process.env.ALIYUN_SMS_ACCESS_KEY_SECRET!,
+      accessKeyId,
+      accessKeySecret,
     });
     config.endpoint = 'dysmsapi.aliyuncs.com';
-    const client = new Dysmsapi.default(config);
+    const client = new Dysmsapi20170525.default(config);
 
-    // 使用类型断言避免SDK类型问题
-    const sendReq = {
+    const sendReq = new Dysmsapi20170525.SendSmsRequest({
       phoneNumbers: phone,
-      signName: process.env.ALIYUN_SMS_SIGN_NAME!,
-      templateCode: process.env.ALIYUN_SMS_TEMPLATE_CODE!,
-      templateParam: JSON.stringify({ code }),
-    };
+      signName,
+      templateCode,
+      templateParam: JSON.stringify({ code, min: '5' }),
+    });
 
     const runtime = new Util.RuntimeOptions({});
-    // @ts-expect-error SDK types mismatch
     const result = await client.sendSmsWithOptions(sendReq, runtime);
 
+    console.log(`[SMS] Send to ${phone}, code=${result.body?.code}, message=${result.body?.message}`);
     return result.body?.code === 'OK';
   } catch (smsError) {
-    console.error('SMS API error:', smsError);
+    console.error('[SMS] API error:', smsError);
     return false;
   }
 }
@@ -52,7 +62,6 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'send') {
-      // 发送验证码
       // 检查频率限制：60秒内只能发一次
       const existing = codeStore.get(phone);
       if (existing && existing.expires > Date.now() - 54000) {
@@ -63,12 +72,12 @@ export async function POST(request: NextRequest) {
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       codeStore.set(phone, { code, expires: Date.now() + 300000 }); // 5分钟有效
 
-      // 尝试调用阿里云短信API发送
+      // 调用阿里云短信API发送
       const smsSuccess = await sendSms(phone, code);
       
       if (!smsSuccess) {
-        // 开发环境：即使短信发送失败也返回成功，验证码打印在控制台
-        console.log(`[DEV] SMS code for ${phone}: ${code}`);
+        // 开发环境：短信发送失败也返回成功，验证码打印在控制台
+        console.log(`[DEV] Fallback - SMS code for ${phone}: ${code}`);
       }
 
       return NextResponse.json({ success: true, message: '验证码已发送' });
@@ -86,8 +95,8 @@ export async function POST(request: NextRequest) {
       codeStore.delete(phone);
 
       // 查找或创建用户
-      const { createClient } = await import('@/lib/supabase/server');
-      const supabase = createClient();
+      const { createAdminClient } = await import('@/lib/supabase/admin');
+      const supabase = createAdminClient();
 
       // 先查用户
       let { data: user } = await supabase
