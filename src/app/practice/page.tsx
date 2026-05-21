@@ -46,15 +46,14 @@ function PracticeContent() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // 预加载语音：仅在AI回复完成后预加载（避免SSE流式内容被截断缓存）
+  // 预加载语音：AI回复过程中就预加载（内容hash变化会自动重载）
   useEffect(() => {
-    if (isLoading) return; // AI还在回复时不预加载
     messages.forEach(msg => {
-      if (msg.role === 'assistant' && msg.content) {
+      if (msg.role === 'assistant' && msg.content && msg.content.length > 10) {
         preload(msg.content, msg.id);
       }
     });
-  }, [messages, preload, isLoading]);
+  }, [messages, preload]);
 
   // 开始面试（带权益检查）
   const startInterview = async () => {

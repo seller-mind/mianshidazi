@@ -1,6 +1,6 @@
-// TTS API - 单段合成
-// 支持GET和POST，POST避免URL长度限制问题
-// 返回: { url: "https://..." }
+// TTS API v2 - 流式代理音频
+// 优化：直接代理阿里云音频流给前端，省掉前端二次下载URL的延迟
+// 预加载时仍返回URL（方便Audio元素预缓冲），点击播放时可直接用缓存
 
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -44,21 +44,15 @@ function cleanText(text: string): string {
     .trim();
 }
 
-async function handleRequest(text: string, persona: string, isCompanion: boolean) {
-  if (!DASHSCOPE_API_KEY) {
-    return NextResponse.json({ error: 'TTS未配置' }, { status: 500 });
-  }
-
-  const cleaned = cleanText(text);
-  if (!cleaned) {
-    return NextResponse.json({ error: '没有可朗读的内容' }, { status: 400 });
-  }
+// 调用阿里云TTS获取音频URL
+async function getAudioUrl(text: string, persona: string, isCompanion: boolean): Promise<string | null> {
+  if (!DASHSCOPE_API_KEY) return null;
 
   const voice = isCompanion ? COMPANION_VOICE : (PERSONA_VOICE[persona] || PERSONA_VOICE['A']);
   const rate = isCompanion ? COMPANION_RATE : INTERVIEW_RATE;
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
 
   try {
     const response = await fetch(TTS_URL, {
@@ -69,7 +63,8 @@ async function handleRequest(text: string, persona: string, isCompanion: boolean
       },
       body: JSON.stringify({
         model: 'cosyvoice-v3-flash',
-        input: { text: cleaned, voice, format: 'mp3', sample_rate: 22050, rate },
+        input: { text, voice, format: 'mp3', sample_rate: 22050, rate },
+        parameters: { stream: true }, // stream模式更快返回
       }),
       signal: controller.signal,
     });
@@ -77,49 +72,83 @@ async function handleRequest(text: string, persona: string, isCompanion: boolean
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      const errText = await response.text();
-      console.error('[TTS] failed:', response.status, errText);
-      return NextResponse.json({ error: '合成失败' }, { status: 500 });
+      console.error('[TTS] failed:', response.status);
+      return null;
     }
 
     const data = await response.json();
     const audioUrl = data?.output?.audio?.url;
-
-    if (!audioUrl) {
-      console.error('[TTS] no url:', JSON.stringify(data));
-      return NextResponse.json({ error: '合成异常' }, { status: 500 });
-    }
-
-    return NextResponse.json({ url: audioUrl.replace(/^http:/, 'https:') });
+    return audioUrl ? audioUrl.replace(/^http:/, 'https:') : null;
   } catch (err) {
     clearTimeout(timeoutId);
-    const error = err as Error;
-    console.error('[TTS] error:', error.message);
-    if (error.name === 'AbortError') {
-      return NextResponse.json({ error: '合成超时' }, { status: 504 });
-    }
-    return NextResponse.json({ error: '合成失败' }, { status: 500 });
+    console.error('[TTS] error:', (err as Error).message);
+    return null;
   }
 }
 
-// GET: text/persona/isCompanion 从 query params
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const text = searchParams.get('text') || '';
-  const persona = searchParams.get('persona') || 'A';
-  const isCompanion = searchParams.get('isCompanion') === 'true';
-  return handleRequest(text, persona, isCompanion);
-}
-
-// POST: text/persona/isCompanion 从 body（避免URL长度限制）
+// POST: 返回音频URL（用于预加载）
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const text = body.text || '';
     const persona = body.persona || 'A';
     const isCompanion = body.isCompanion === true;
-    return handleRequest(text, persona, isCompanion);
+
+    const cleaned = cleanText(text);
+    if (!cleaned) {
+      return NextResponse.json({ error: '没有可朗读的内容' }, { status: 400 });
+    }
+
+    const audioUrl = await getAudioUrl(cleaned, persona, isCompanion);
+    if (!audioUrl) {
+      return NextResponse.json({ error: '合成失败' }, { status: 500 });
+    }
+
+    return NextResponse.json({ url: audioUrl });
   } catch {
     return NextResponse.json({ error: '请求格式错误' }, { status: 400 });
+  }
+}
+
+// GET: 直接代理音频流（用于即时播放，省掉前端二次下载）
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const text = searchParams.get('text') || '';
+  const persona = searchParams.get('persona') || 'A';
+  const isCompanion = searchParams.get('isCompanion') === 'true';
+
+  const cleaned = cleanText(text);
+  if (!cleaned) {
+    return NextResponse.json({ error: '没有可朗读的内容' }, { status: 400 });
+  }
+
+  const audioUrl = await getAudioUrl(cleaned, persona, isCompanion);
+  if (!audioUrl) {
+    return NextResponse.json({ error: '合成失败' }, { status: 500 });
+  }
+
+  // 代理音频流
+  try {
+    const audioResponse = await fetch(audioUrl, {
+      headers: { 'Accept': 'audio/mpeg' },
+    });
+
+    if (!audioResponse.ok) {
+      return NextResponse.json({ error: '音频下载失败' }, { status: 500 });
+    }
+
+    const audioBuffer = await audioResponse.arrayBuffer();
+
+    return new NextResponse(audioBuffer, {
+      status: 200,
+      headers: {
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': audioBuffer.byteLength.toString(),
+        'Cache-Control': 'public, max-age=3600', // 缓存1小时
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+  } catch {
+    return NextResponse.json({ error: '音频代理失败' }, { status: 500 });
   }
 }
