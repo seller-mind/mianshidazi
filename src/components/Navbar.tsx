@@ -31,8 +31,8 @@ export function Navbar() {
         alignItems: 'center',
         justifyContent: 'space-between',
       }}>
-        {/* Logo */}
-        <Link href="/" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', textDecoration: 'none' }}>
+        {/* Logo - 点击回首页 */}
+        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}>
           <div style={{
             width: '28px',
             height: '28px',
@@ -45,13 +45,13 @@ export function Navbar() {
             fontWeight: 'bold',
             fontSize: '13px',
           }}>搭</div>
-          <span style={{ fontWeight: 600, fontSize: '12px', color: '#1F2937', lineHeight: 1 }}>面试搭子</span>
+          <span style={{ fontWeight: 600, fontSize: '14px', color: '#1F2937', lineHeight: 1 }}>面试搭子</span>
         </Link>
         
-        {/* 桌面端 - 用CSS media query控制显示 */}
+        {/* 桌面端 */}
         <div className="navbar-desktop" style={{ display: 'none', alignItems: 'center', gap: '24px' }}>
           <Link href="/diagnose" style={{ fontSize: '14px', color: '#6B7280', textDecoration: 'none' }}>
-            紧张类型测试
+            紧张测试
           </Link>
           <Link href="/practice" style={{ fontSize: '14px', color: '#6B7280', textDecoration: 'none' }}>
             模拟面试
@@ -63,29 +63,32 @@ export function Navbar() {
           {isLoggedIn ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <span style={{ fontSize: '12px', color: '#6B7280' }}>
-                {user?.email || user?.phone?.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')}
+                {user?.nickname || user?.phone?.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')}
                 {activePlan && <span style={{ marginLeft: '4px', color: '#FF6B35' }}>· {activePlan === 'single' ? '单次' : activePlan === 'monthly' ? '月卡' : '季卡'}</span>}
               </span>
-              <Link href="/profile" style={{ fontSize: '12px', color: '#6B7280', textDecoration: 'none' }}>
-                设置
+              <Link href="/profile" style={{ textDecoration: 'none' }}>
+                <div style={{
+                  width: '30px',
+                  height: '30px',
+                  borderRadius: '50%',
+                  overflow: 'hidden',
+                  background: '#F3F4F6',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  border: '2px solid #E5E7EB',
+                }}>
+                  {user?.avatar_url ? (
+                    <img src={user.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <span style={{ fontSize: '14px' }}>😊</span>
+                  )}
+                </div>
               </Link>
               <button onClick={handleLogout} style={{ fontSize: '12px', color: '#9CA3AF', background: 'none', border: 'none', cursor: 'pointer' }}>
                 退出
               </button>
-              <Link
-                href="/practice"
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#FF6B35',
-                  color: '#FFFFFF',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  borderRadius: '8px',
-                  textDecoration: 'none',
-                }}
-              >
-                开始使用
-              </Link>
             </div>
           ) : (
             <Link
@@ -106,40 +109,53 @@ export function Navbar() {
         </div>
 
         {/* 手机端 */}
-        <div className="navbar-mobile" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Link href="/practice" style={{ fontSize: '10px', color: '#6B7280', textDecoration: 'none' }}>
-            🎯 模拟面试
+        <div className="navbar-mobile" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Link href="/diagnose" style={{ fontSize: '10px', color: '#6B7280', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+            紧张测试
+          </Link>
+          <Link href="/practice" style={{ fontSize: '10px', color: '#6B7280', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+            模拟面试
+          </Link>
+          <Link href="/companion" style={{ fontSize: '10px', color: '#6B7280', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+            阿搭聊天
           </Link>
           
           {isLoggedIn ? (
             <>
-            <Link
-              href="/profile"
-              style={{
-                padding: '4px 10px',
-                backgroundColor: '#F3F4F6',
-                fontSize: '10px',
-                color: '#6B7280',
-                textDecoration: 'none',
-                borderRadius: '6px',
-              }}
-            >
-              设置
-            </Link>
-            <button
-              onClick={handleLogout}
-              style={{
-                padding: '4px 10px',
-                backgroundColor: '#F3F4F6',
-                fontSize: '10px',
-                color: '#6B7280',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-              }}
-            >
-              退出
-            </button>
+              <Link href="/profile" style={{ textDecoration: 'none' }}>
+                <div style={{
+                  width: '26px',
+                  height: '26px',
+                  borderRadius: '50%',
+                  overflow: 'hidden',
+                  background: '#F3F4F6',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  border: '2px solid #E5E7EB',
+                }}>
+                  {user?.avatar_url ? (
+                    <img src={user.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <span style={{ fontSize: '12px' }}>😊</span>
+                  )}
+                </div>
+              </Link>
+              <button
+                onClick={handleLogout}
+                style={{
+                  padding: '4px 8px',
+                  backgroundColor: '#F3F4F6',
+                  fontSize: '10px',
+                  color: '#9CA3AF',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                }}
+              >
+                退出
+              </button>
             </>
           ) : (
             <Link
