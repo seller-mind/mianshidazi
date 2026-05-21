@@ -79,9 +79,20 @@ export function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
               value={phone}
               onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
               placeholder="请输入11位手机号"
-              className="w-full px-4 py-4 rounded-xl border-2 border-gray-300 bg-white text-[#1F2937] text-lg placeholder:text-gray-400 focus:outline-none focus:border-[#FF6B35] mb-4"
               maxLength={11}
-              style={{ WebkitAppearance: 'none', appearance: 'none' }}
+              style={{
+                width: '100%',
+                padding: '14px 16px',
+                borderRadius: '12px',
+                border: '2px solid #D1D5DB',
+                backgroundColor: '#FFFFFF',
+                color: '#1F2937',
+                fontSize: '18px',
+                outline: 'none',
+                marginBottom: '16px',
+                boxSizing: 'border-box',
+                display: 'block',
+              }}
             />
             <button
               onClick={handleSendCode}
@@ -104,10 +115,23 @@ export function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
               value={code}
               onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
               placeholder="请输入6位验证码"
-              className="w-full px-4 py-4 rounded-xl border-2 border-gray-300 bg-white text-[#1F2937] text-xl placeholder:text-gray-400 focus:outline-none focus:border-[#FF6B35] mb-4 text-center tracking-[0.5em]"
               maxLength={6}
               autoFocus
-              style={{ WebkitAppearance: 'none', appearance: 'none' }}
+              style={{
+                width: '100%',
+                padding: '14px 16px',
+                borderRadius: '12px',
+                border: '2px solid #D1D5DB',
+                backgroundColor: '#FFFFFF',
+                color: '#1F2937',
+                fontSize: '20px',
+                outline: 'none',
+                marginBottom: '16px',
+                boxSizing: 'border-box',
+                display: 'block',
+                textAlign: 'center',
+                letterSpacing: '0.5em',
+              }}
             />
             <button
               onClick={handleVerify}
