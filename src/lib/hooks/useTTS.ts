@@ -100,7 +100,7 @@ function getAudioPipeline(): { ctx: AudioContext; gain: GainNode } | null {
     if (!_audioCtx || _audioCtx.state === 'closed') {
       _audioCtx = new AudioContext();
       _gainNode = _audioCtx.createGain();
-      _gainNode.gain.value = 1.5;
+      _gainNode.gain.value = 3.0;
       _gainNode.connect(_audioCtx.destination);
     }
     return { ctx: _audioCtx, gain: _gainNode! };

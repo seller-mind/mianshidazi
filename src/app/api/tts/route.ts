@@ -63,7 +63,7 @@ async function getAudioUrl(text: string, persona: string, isCompanion: boolean):
       },
       body: JSON.stringify({
         model: 'cosyvoice-v3-flash',
-        input: { text, voice, format: 'mp3', sample_rate: 22050, rate },
+        input: { text, voice, format: 'mp3', sample_rate: 24000, rate },
         parameters: { stream: true }, // stream模式更快返回
       }),
       signal: controller.signal,
