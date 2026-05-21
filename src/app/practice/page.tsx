@@ -63,16 +63,22 @@ function PracticeContent() {
     setAuthChecking(true);
     try {
       // 1. 检查登录状态
-      const meRes = await fetch('/api/auth/me');
-      if (!meRes.ok) {
-        // 未登录，跳转登录页
+      const meRes = await fetch('/api/auth/me', { redirect: 'follow', credentials: 'include' });
+      if (meRes.redirected) {
+        // 被重定向说明session丢失，跳转登录
+        router.push('/login');
+        setAuthChecking(false);
+        return;
+      }
+      const meData = await meRes.json();
+      if (!meData.user) {
         router.push('/login');
         setAuthChecking(false);
         return;
       }
 
       // 2. 检查订阅权益
-      const subRes = await fetch('/api/subscription/check');
+      const subRes = await fetch('/api/subscription/check', { redirect: 'follow', credentials: 'include' });
       const subData = await subRes.json();
       
       if (!subData.canPractice) {
@@ -84,7 +90,7 @@ function PracticeContent() {
 
       // 3. 扣减面试次数（单次套餐需要扣）
       if (subData.plan === 'single') {
-        await fetch('/api/subscription/check', { method: 'POST' });
+        await fetch('/api/subscription/check', { method: 'POST', redirect: 'follow', credentials: 'include' });
       }
 
       // 4. 通过检查，开始面试
