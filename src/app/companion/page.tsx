@@ -25,8 +25,11 @@ export default function CompanionPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [sessionId] = useState(() => generateId());
+  const [sessionId, setSessionId] = useState(() => generateId());
   const [context, setContext] = useState('日常');
+  const [pastSessions, setPastSessions] = useState<{ id: string; title: string; updated_at: string }[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+  const [showHistory, setShowHistory] = useState(false);
   const { user: authUser } = useAuthContext();
 
   // 保存消息到Supabase
@@ -64,6 +67,54 @@ export default function CompanionPage() {
       console.warn('[Companion] Save messages failed:', err);
     }
   }, [sessionId]);
+
+  // 获取历史聊天记录
+  const fetchPastSessions = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('msd_token');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch('/api/chat/sessions?type=companion', { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setPastSessions((data.sessions || []).filter((s: any) => s.type === 'companion'));
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, []);
+
+  // 恢复历史会话
+  const resumeSession = useCallback(async (session: { id: string; title: string }) => {
+    try {
+      const token = localStorage.getItem('msd_token');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`/api/chat/messages?session_id=${session.id}`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        const msgs: Message[] = (data.messages || []).map((m: any) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          isVoice: m.is_voice || false,
+        }));
+        setSessionId(session.id);
+        setMessages(msgs);
+        setShowHistory(false);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // 加载历史记录
+  useEffect(() => {
+    fetchPastSessions();
+  }, [fetchPastSessions]);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { play, isPlayingMessage, isLoadingMessage } = useTTS({ isCompanion: true });
@@ -79,8 +130,11 @@ export default function CompanionPage() {
     }
   }, [messages, saveMessages]);
 
-  // 初始化欢迎消息
+  // 初始化欢迎消息（仅首次进入时）
+  const [initialized, setInitialized] = useState(false);
   useEffect(() => {
+    if (initialized) return;
+    setInitialized(true);
     const hour = new Date().getHours();
     let welcomeContext = '日常';
     if (hour >= 0 && hour < 6) welcomeContext = '深夜';
@@ -101,7 +155,7 @@ export default function CompanionPage() {
       });
     }
     setMessages(welcomeMessages);
-  }, []);
+  }, [initialized]);
 
   // 发送消息给AI
   const sendToAI = useCallback(async (text: string, historyMessages: Message[]) => {
@@ -292,7 +346,44 @@ export default function CompanionPage() {
         </div>
       </div>
 
+      {/* 历史记录列表 */}
+      {showHistory && (
+        <div className="flex-1 overflow-y-auto px-4 py-4">
+          <div className="max-w-2xl mx-auto">
+            {loadingHistory ? (
+              <p className="text-gray-400 text-sm text-center py-8">加载中...</p>
+            ) : pastSessions.length === 0 ? (
+              <p className="text-gray-400 text-sm text-center py-8">暂无历史记录</p>
+            ) : (
+              <div className="space-y-2">
+                {pastSessions.slice(0, 20).map((session) => {
+                  const date = new Date(session.updated_at);
+                  const dateStr = `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+                  return (
+                    <div
+                      key={session.id}
+                      onClick={() => resumeSession(session)}
+                      className="flex items-center gap-3 p-3 bg-[#2A2A45] rounded-xl cursor-pointer hover:bg-[#3A3A55] transition-colors"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF6B35] to-[#E55A28] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">搭</div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-200">{session.title || '阿搭聊天'}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{dateStr}</p>
+                      </div>
+                      <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* 消息列表 */}
+      {!showHistory && (
       <div className="flex-1 overflow-y-auto px-4 py-4">
         <div className="max-w-2xl mx-auto space-y-4">
           <div className="text-xs text-gray-400 py-2 px-3 bg-[#3A3A55]/50 rounded-lg border border-amber-900/30 mb-4">
@@ -371,6 +462,7 @@ export default function CompanionPage() {
           <div ref={messagesEndRef} />
         </div>
       </div>
+      )}
 
       {/* 输入框 */}
       <div className="bg-[#252542] border-t border-gray-800 px-4 py-4">

@@ -29,10 +29,13 @@ export async function GET(request: NextRequest) {
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
     const supabase = getSupabase();
 
-    const { data: sessions, error } = await supabase
+    const type = request.nextUrl.searchParams.get('type');
+    let query = supabase
       .from('chat_sessions')
       .select('*')
-      .eq('user_id', decoded.userId)
+      .eq('user_id', decoded.userId);
+    if (type) query = query.eq('type', type);
+    const { data: sessions, error } = await query
       .order('updated_at', { ascending: false })
       .limit(50);
 

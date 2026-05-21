@@ -31,12 +31,18 @@ function PracticeContent() {
   
   const [step, setStep] = useState<'select' | 'prepare' | 'interview'>('select');
   const [selectedPersona, setSelectedPersona] = useState<PersonaType | null>(null);
-  const [sessionId] = useState(() => generateId());
+  const [sessionId, setSessionId] = useState(() => generateId());
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [interviewEnded, setInterviewEnded] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [pastSessions, setPastSessions] = useState<{ id: string; persona: string; title: string; updated_at: string }[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [pastSessions, setPastSessions] = useState<{ id: string; persona: string; title: string; updated_at: string }[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
   const [authChecking, setAuthChecking] = useState(false);
   const { user: authUser } = useAuthContext();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -82,6 +88,55 @@ function PracticeContent() {
       console.warn('[Practice] Save messages failed:', err);
     }
   }, [sessionId, selectedPersona]);
+
+  // 获取历史面试记录
+  const fetchPastSessions = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('msd_token');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch('/api/chat/sessions?type=interview', { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setPastSessions((data.sessions || []).filter((s: any) => s.type === 'interview'));
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, []);
+
+  // 恢复历史会话
+  const resumeSession = useCallback(async (session: { id: string; persona: string }) => {
+    try {
+      const token = localStorage.getItem('msd_token');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`/api/chat/messages?session_id=${session.id}`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        const msgs: Message[] = (data.messages || []).map((m: any) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          isVoice: m.is_voice || false,
+        }));
+        setSessionId(session.id);
+        setSelectedPersona(session.persona as PersonaType);
+        setMessages(msgs);
+        setStep('interview');
+        setInterviewEnded(true); // 历史面试已结束，显示查看报告/再来一次
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // 加载历史记录
+  useEffect(() => {
+    fetchPastSessions();
+  }, [fetchPastSessions]);
 
   // 滚动到底部
   useEffect(() => {
@@ -320,6 +375,8 @@ function PracticeContent() {
 
   // 生成报告并跳转
   const goToReport = async () => {
+    if (isGeneratingReport) return; // 防止重复点击
+    setIsGeneratingReport(true);
     try {
       // 调用报告生成API
       const res = await fetch('/api/report/generate', {
@@ -343,6 +400,8 @@ function PracticeContent() {
       window.location.href = '/report';
     } catch {
       window.location.href = '/report';
+    } finally {
+      setIsGeneratingReport(false);
     }
   };
 
@@ -573,6 +632,36 @@ function PracticeContent() {
               {authChecking ? '检查权益中...' : selectedPersona ? `开始 ${PERSONA_CONFIGS[selectedPersona].name}` : '请先选择面试官'}
             </Button>
           </div>
+
+          {/* 历史面试记录 */}
+          {pastSessions.length > 0 && (
+            <div className="mt-8">
+              <h2 className="text-lg font-semibold text-[#1F2937] dark:text-white mb-4">历史面试</h2>
+              <div className="space-y-2">
+                {pastSessions.slice(0, 10).map((session) => {
+                  const personaInfo = PERSONA_CONFIGS[session.persona as PersonaType];
+                  const date = new Date(session.updated_at);
+                  const dateStr = `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+                  return (
+                    <div
+                      key={session.id}
+                      onClick={() => resumeSession(session)}
+                      className="flex items-center gap-3 p-3 bg-white dark:bg-[#252542] rounded-xl border border-gray-100 dark:border-gray-800 cursor-pointer hover:border-[#FF6B35] transition-colors"
+                    >
+                      <span className="text-2xl">{personaInfo?.emoji || '🎯'}</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-[#1F2937] dark:text-white">{session.title || personaInfo?.name || '模拟面试'}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{dateStr}</p>
+                      </div>
+                      <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </main>
     );
@@ -706,10 +795,10 @@ function PracticeContent() {
               面试结束！恭喜你完成了一次练习
             </p>
             <div className="flex gap-3 justify-center">
-              <Button onClick={goToReport}>
-                查看面试报告 →
+              <Button onClick={goToReport} disabled={isGeneratingReport}>
+                {isGeneratingReport ? '正在生成报告...' : '查看面试报告 →'}
               </Button>
-              <Button variant="outline" onClick={() => { setInterviewEnded(false); setMessages([]); setStep('select'); }}>
+              <Button variant="outline" onClick={() => { setInterviewEnded(false); setMessages([]); setStep('select'); setSessionId(generateId()); }}>
                 再来一次
               </Button>
             </div>
