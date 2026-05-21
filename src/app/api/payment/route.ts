@@ -58,7 +58,6 @@ export async function POST(request: NextRequest) {
         plan_id: planId,
         amount: plan.price,
         status: 'pending',
-        title: `面试搭子 - ${plan.name}`,
       });
 
     if (orderError) {
