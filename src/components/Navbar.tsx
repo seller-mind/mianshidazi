@@ -53,11 +53,11 @@ export function Navbar() {
           <Link href="/diagnose" style={{ fontSize: '14px', color: '#6B7280', textDecoration: 'none' }}>
             紧张测试
           </Link>
-          <Link href="/practice" style={{ fontSize: '14px', color: '#6B7280', textDecoration: 'none' }}>
-            模拟面试
-          </Link>
           <Link href="/companion" style={{ fontSize: '14px', color: '#6B7280', textDecoration: 'none' }}>
             阿搭聊天
+          </Link>
+          <Link href="/practice" style={{ fontSize: '14px', color: '#6B7280', textDecoration: 'none' }}>
+            模拟面试
           </Link>
           
           {isLoggedIn ? (
@@ -113,11 +113,11 @@ export function Navbar() {
           <Link href="/diagnose" style={{ fontSize: '10px', color: '#6B7280', textDecoration: 'none', whiteSpace: 'nowrap' }}>
             紧张测试
           </Link>
-          <Link href="/practice" style={{ fontSize: '10px', color: '#6B7280', textDecoration: 'none', whiteSpace: 'nowrap' }}>
-            模拟面试
-          </Link>
           <Link href="/companion" style={{ fontSize: '10px', color: '#6B7280', textDecoration: 'none', whiteSpace: 'nowrap' }}>
             阿搭聊天
+          </Link>
+          <Link href="/practice" style={{ fontSize: '10px', color: '#6B7280', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+            模拟面试
           </Link>
           
           {isLoggedIn ? (
