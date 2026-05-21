@@ -83,9 +83,9 @@ async function handleCallback(params: Record<string, string>) {
     let interviewsRemaining: number | null = null;
 
     if (order.plan_id === 'single') {
-      interviewsRemaining = 1;
+      interviewsRemaining = null; // 日卡不限次数
       const expireDate = new Date(now);
-      expireDate.setDate(expireDate.getDate() + 7);
+      expireDate.setDate(expireDate.getDate() + 1);
       expiresAt = expireDate.toISOString();
     } else if (order.plan_id === 'monthly') {
       const expireDate = new Date(now);

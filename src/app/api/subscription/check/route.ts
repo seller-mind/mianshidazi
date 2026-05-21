@@ -57,8 +57,6 @@ export async function GET(request: NextRequest) {
 
       if (sub.expires_at && new Date(sub.expires_at) < now) {
         await supabase.from('subscriptions').update({ status: 'expired' }).eq('id', sub.id);
-      } else if (sub.plan_id === 'single' && sub.interviews_remaining !== null && sub.interviews_remaining <= 0) {
-        await supabase.from('subscriptions').update({ status: 'expired' }).eq('id', sub.id);
       } else {
         return NextResponse.json({
           canPractice: true,
@@ -113,18 +111,8 @@ export async function POST(request: NextRequest) {
       const now = new Date();
       if (sub.expires_at && new Date(sub.expires_at) < now) {
         await supabase.from('subscriptions').update({ status: 'expired' }).eq('id', sub.id);
-      } else if (sub.plan_id === 'single' && sub.interviews_remaining !== null) {
-        if (sub.interviews_remaining <= 0) {
-          await supabase.from('subscriptions').update({ status: 'expired' }).eq('id', sub.id);
-          return NextResponse.json({ error: '面试次数已用完' }, { status: 403 });
-        }
-        await supabase
-          .from('subscriptions')
-          .update({ interviews_remaining: sub.interviews_remaining - 1 })
-          .eq('id', sub.id);
-        return NextResponse.json({ success: true, source: 'subscription' });
       } else {
-        // 月卡/季卡无需扣次数
+        // 日卡/月卡/季卡都在有效期内，不限次数
         return NextResponse.json({ success: true, source: 'subscription' });
       }
     }

@@ -7,15 +7,15 @@ import { Button } from '@/components/ui';
 const PRICING_PLANS = [
   {
     id: 'single',
-    name: '单次模拟面试',
+    name: '日卡畅练',
     price: 9.9,
-    priceLabel: '¥9.9',
+    priceLabel: '¥9.9/天',
     originalPrice: null,
-    description: '先试一次',
+    description: '先试一天',
     features: [
-      '1次模拟面试',
+      '当天无限次模拟面试',
       '面试练习报告',
-      '1种面试官人格',
+      '5种面试官人格',
     ],
     freeNote: '紧张类型测试 · 阿搭聊天 · 免费',
     cta: '开始模拟面试',

@@ -7,7 +7,7 @@ const APP_SECRET = process.env.XUNHU_APP_SECRET || '';
 const BASE_URL = 'https://www.mianshidazi.com';
 
 const PRICE_MAP: Record<string, { price: number; name: string }> = {
-  single: { price: 9.9, name: '单次模拟面试' },
+  single: { price: 9.9, name: '日卡畅练' },
   monthly: { price: 39, name: '月卡会员' },
   quarterly: { price: 99, name: '季卡会员' },
 };

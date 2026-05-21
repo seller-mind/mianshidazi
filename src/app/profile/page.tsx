@@ -23,7 +23,7 @@ interface Order {
 }
 
 const PLAN_LABELS: Record<string, string> = {
-  single: '单次模拟面试',
+  single: '日卡畅练',
   monthly: '月卡会员',
   quarterly: '季卡会员',
 };
@@ -207,16 +207,9 @@ export default function ProfilePage() {
                 <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">有效</span>
               </div>
               <div className="space-y-1 mt-3">
-                {activeSub.plan_id === 'single' && (
-                  <p className="text-sm text-gray-600 dark:text-gray-300">
-                    剩余次数：<span className="font-medium text-[#FF6B35]">{activeSub.interviews_remaining ?? 0}</span> 次
-                  </p>
-                )}
-                {(activeSub.plan_id === 'monthly' || activeSub.plan_id === 'quarterly') && (
-                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                <p className="text-sm text-gray-600 dark:text-gray-300">
                     模拟面试：<span className="font-medium text-[#FF6B35]">无限次</span>
                   </p>
-                )}
                 <p className="text-sm text-gray-600 dark:text-gray-300">
                   到期时间：<span className="font-medium">{formatDate(activeSub.expires_at)}</span>
                 </p>

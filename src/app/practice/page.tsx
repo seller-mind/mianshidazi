@@ -177,7 +177,7 @@ function PracticeContent() {
         return;
       }
 
-      if (subData.plan === 'free' || subData.plan === 'single') {
+      if (subData.plan === 'free') {
         await fetch('/api/subscription/check', { method: 'POST', redirect: 'follow', credentials: 'include', headers: authHeaders });
       }
 

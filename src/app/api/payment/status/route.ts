@@ -60,9 +60,9 @@ export async function GET(request: NextRequest) {
         let interviewsRemaining: number | null = null;
 
         if (order.plan_id === 'single') {
-          interviewsRemaining = 1;
+          interviewsRemaining = null; // 日卡不限次数
           const d = new Date(now);
-          d.setDate(d.getDate() + 7);
+          d.setDate(d.getDate() + 1);
           expiresAt = d.toISOString();
         } else if (order.plan_id === 'monthly') {
           const d = new Date(now);
