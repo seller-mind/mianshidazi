@@ -267,9 +267,32 @@ function PracticeContent() {
     setInterviewEnded(true);
   };
 
-  // 跳转到报告
-  const goToReport = () => {
-    window.location.href = `/report?session=${sessionId}`;
+  // 生成报告并跳转
+  const goToReport = async () => {
+    try {
+      // 调用报告生成API
+      const res = await fetch('/api/report/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          messages: messages.map(m => ({ role: m.role, content: m.content })),
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.data) {
+          // 存到localStorage供报告页读取
+          localStorage.setItem('msd_report', JSON.stringify(data.data));
+          window.location.href = '/report';
+          return;
+        }
+      }
+      // API失败也跳转，报告页会处理空数据
+      window.location.href = '/report';
+    } catch {
+      window.location.href = '/report';
+    }
   };
 
   // 语音发送：立即显示气泡，后台STT+AI

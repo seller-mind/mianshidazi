@@ -33,20 +33,7 @@ export function ProductShowcaseSection() {
       color: 'from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20',
       tag: '进步可见',
     },
-    {
-      emoji: '🎭',
-      title: 'KPI面识别',
-      description: '基于机构真实数据，帮你快速识别KPI面——不是你不够好，是流程在走形式。',
-      color: 'from-purple-50 to-violet-50 dark:from-purple-900/20 dark:to-violet-900/20',
-      tag: '独家功能',
-    },
-    {
-      emoji: '📖',
-      title: '真实知识来源',
-      description: '阿搭说的话，是有来源的：有机构调查、心理学研究，赋能你的面试。',
-      color: 'from-cyan-50 to-teal-50 dark:from-cyan-900/20 dark:to-teal-900/20',
-      tag: '知识支撑',
-    },
+
   ];
 
   return (
