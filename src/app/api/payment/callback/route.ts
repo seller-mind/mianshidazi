@@ -17,7 +17,7 @@ function verifyHash(params: Record<string, string>): boolean {
   const signStr = Object.keys(filtered)
     .sort()
     .map(key => `${key}=${filtered[key]}`)
-    .join('&') + `&key=${APP_SECRET}`;
+    .join('&') + APP_SECRET;
 
   const calculatedHash = crypto.createHash('md5').update(signStr).digest('hex').toLowerCase();
 

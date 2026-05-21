@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       .filter(key => params[key] !== '' && params[key] !== undefined)
       .sort()
       .map(key => `${key}=${params[key]}`)
-      .join('&') + `&key=${APP_SECRET}`;
+      .join('&') + APP_SECRET;
     
     const hash = crypto.createHash('md5').update(signStr).digest('hex').toLowerCase();
 
