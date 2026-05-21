@@ -8,8 +8,8 @@ const BASE_URL = 'https://www.mianshidazi.com';
 
 const PRICE_MAP: Record<string, { price: number; name: string }> = {
   single: { price: 9.9, name: '单次模拟面试' },
-  monthly: { price: 29.9, name: '月卡会员' },
-  quarterly: { price: 69.9, name: '季卡会员' },
+  monthly: { price: 39, name: '月卡会员' },
+  quarterly: { price: 99, name: '季卡会员' },
 };
 
 export async function POST(request: NextRequest) {

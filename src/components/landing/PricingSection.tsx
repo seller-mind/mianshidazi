@@ -10,6 +10,7 @@ const PRICING_PLANS = [
     name: '单次模拟面试',
     price: 9.9,
     priceLabel: '¥9.9',
+    originalPrice: null,
     description: '先试一次',
     features: [
       '1次模拟面试',
@@ -23,9 +24,10 @@ const PRICING_PLANS = [
   {
     id: 'monthly',
     name: '月卡会员',
-    price: 29.9,
-    priceLabel: '¥29.9/月',
-    description: '约等于3杯奶茶',
+    price: 39,
+    priceLabel: '¥39/月',
+    originalPrice: '¥99',
+    description: '约等于4杯奶茶',
     features: [
       '无限次模拟面试',
       '面试练习报告',
@@ -38,13 +40,16 @@ const PRICING_PLANS = [
   {
     id: 'quarterly',
     name: '季卡会员',
-    price: 69.9,
-    priceLabel: '¥69.9/季',
+    price: 99,
+    priceLabel: '¥99/季',
+    originalPrice: '¥279',
     description: '约等于2杯奶茶/月',
     features: [
       '无限次模拟面试',
       '面试练习报告',
       '5种面试官人格',
+      '历史报告回顾',
+      '面试复盘指导',
       '专属紧张缓解方案',
     ],
     freeNote: '紧张类型测试 · 阿搭聊天 · 免费',
@@ -65,15 +70,12 @@ export function PricingSection() {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      // 先检查是否登录
       const meRes = await fetch('/api/auth/me', { headers: { Authorization: headers['Authorization'] || '' } });
       if (!meRes.ok) {
-        // 未登录，跳转登录页
         window.location.href = '/login';
         return;
       }
 
-      // 创建支付订单
       const payRes = await fetch('/api/payment', {
         method: 'POST',
         headers,
@@ -146,6 +148,9 @@ export function PricingSection() {
               </div>
 
               <div className="text-center mb-4 md:mb-6">
+                {plan.originalPrice && (
+                  <span className="text-sm text-gray-400 line-through mr-2">{plan.originalPrice}</span>
+                )}
                 <span className="text-2xl md:text-3xl font-bold text-[#1F2937] dark:text-white">
                   {plan.priceLabel}
                 </span>
