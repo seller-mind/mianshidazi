@@ -3,7 +3,15 @@ import jwt from 'jsonwebtoken';
 
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get('msd_token')?.value;
+    // 优先从cookie取，其次从Authorization header取
+    let token = request.cookies.get('msd_token')?.value;
+    
+    if (!token) {
+      const authHeader = request.headers.get('authorization');
+      if (authHeader?.startsWith('Bearer ')) {
+        token = authHeader.slice(7);
+      }
+    }
 
     if (!token) {
       return NextResponse.json({ user: null, subscriptions: [] });
@@ -15,8 +23,11 @@ export async function GET(request: NextRequest) {
       phone?: string;
     };
 
-    const { createAdminClient } = await import('@/lib/supabase/admin');
-    const supabase = createAdminClient();
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
     // 查用户
     const { data: user, error } = await supabase

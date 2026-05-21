@@ -51,7 +51,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUser = useCallback(async () => {
     try {
-      const res = await fetch('/api/auth/me');
+      const token = typeof window !== 'undefined' ? localStorage.getItem('msd_token') : null;
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch('/api/auth/me', { headers });
       if (res.ok) {
         const data = await res.json();
         setUser(data.user || null);
@@ -76,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
+    localStorage.removeItem('msd_token');
     setUser(null);
     setSubscriptions([]);
   };

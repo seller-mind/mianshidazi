@@ -246,6 +246,7 @@ async function loginUser(phone: string) {
   const response = NextResponse.json({
     success: true,
     user: { id: user.id, phone: user.phone, nickname: user.nickname },
+    token, // 同时返回token给前端存localStorage
   });
 
   response.cookies.set('msd_token', token, {

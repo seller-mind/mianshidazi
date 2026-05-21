@@ -43,6 +43,10 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || '验证失败'); return; }
+      // 存token到localStorage，备用认证方式
+      if (data.token) {
+        localStorage.setItem('msd_token', data.token);
+      }
       router.push('/practice');
     } catch { setError('网络错误'); }
     finally { setLoading(false); }
