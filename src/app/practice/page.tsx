@@ -521,11 +521,6 @@ function PracticeContent() {
               结束面试
             </Button>
           )}
-          {interviewEnded && (
-            <Button size="sm" onClick={goToReport}>
-              查看报告
-            </Button>
-          )}
         </div>
       </header>
 
@@ -607,23 +602,27 @@ function PracticeContent() {
         </div>
       </div>
 
-      {/* 面试结束提示 */}
-      {interviewEnded && (
+
+
+      {/* 底部操作区 */}
+      {interviewEnded ? (
         <div className="bg-green-50 dark:bg-green-900/20 border-t border-green-200 dark:border-green-800 px-6 py-4">
           <div className="max-w-2xl mx-auto text-center">
             <p className="text-green-700 dark:text-green-400 text-sm mb-3">
-              🎉 面试结束！恭喜你完成了一次练习
+              面试结束！恭喜你完成了一次练习
             </p>
-            <Button onClick={goToReport}>
-              查看面试报告 →
-            </Button>
+            <div className="flex gap-3 justify-center">
+              <Button onClick={goToReport}>
+                查看面试报告 →
+              </Button>
+              <Button variant="outline" onClick={() => { setInterviewEnded(false); setMessages([]); setStep('select'); }}>
+                再来一次
+              </Button>
+            </div>
           </div>
         </div>
-      )}
-
-      {/* 输入区域 */}
-      {!interviewEnded && (
-        <footer className="bg-white dark:bg-[#252542] border-t border-gray-100 dark:border-gray-800 px-6 py-4">
+      ) : (
+        <footer className="bg-white dark:bg-[#252542] border-t border-gray-100 dark:border-gray-800 px-6 py-3">
           <div className="max-w-2xl mx-auto">
             <div className="flex gap-3 items-end">
               <VoiceInput
@@ -648,9 +647,17 @@ function PracticeContent() {
                 </svg>
               </Button>
             </div>
-            <p className="text-xs text-gray-400 mt-2 text-center">
-              按 Enter 发送 · 像真实面试一样回答
-            </p>
+            <div className="flex items-center justify-between mt-2">
+              <p className="text-xs text-gray-400">
+                按 Enter 发送
+              </p>
+              <button
+                onClick={endInterview}
+                className="text-xs text-gray-400 hover:text-[#FF6B35] transition-colors"
+              >
+                结束面试 →
+              </button>
+            </div>
           </div>
         </footer>
       )}
