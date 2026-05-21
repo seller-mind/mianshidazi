@@ -3,38 +3,46 @@ import crypto from 'crypto';
 
 const APP_SECRET = process.env.XUNHU_APP_SECRET || '';
 
-function verifySign(params: Record<string, string>): boolean {
-  const sign = params.sign;
-  const signType = params.sign_type;
-  const filtered = { ...params };
-  delete filtered.sign;
-  delete filtered.sign_type;
+function verifyHash(params: Record<string, string>): boolean {
+  const receivedHash = params.hash;
+  if (!receivedHash) return false;
+
+  // 按虎皮椒文档：排除hash和空值，按ASCII码升序排列，拼接key=secret后MD5
+  const filtered: Record<string, string> = {};
+  for (const [k, v] of Object.entries(params)) {
+    if (k === 'hash' || v === '' || v === undefined || v === null) continue;
+    filtered[k] = v;
+  }
 
   const signStr = Object.keys(filtered)
     .sort()
     .map(key => `${key}=${filtered[key]}`)
-    .join('&') + APP_SECRET;
+    .join('&') + `&key=${APP_SECRET}`;
 
-  const calculatedSign = signType === 'HMAC-SHA256'
-    ? crypto.createHmac('sha256', APP_SECRET).update(signStr).digest('hex').toLowerCase()
-    : crypto.createHash('md5').update(signStr).digest('hex').toLowerCase();
+  const calculatedHash = crypto.createHash('md5').update(signStr).digest('hex').toLowerCase();
 
-  return sign === calculatedSign;
+  return receivedHash === calculatedHash;
 }
 
 async function handleCallback(params: Record<string, string>) {
   console.log('Payment callback received:', JSON.stringify(params));
 
   // 验证签名
-  if (!verifySign(params)) {
-    console.error('Sign verification failed. Expected sign for:', JSON.stringify(params));
+  if (!verifyHash(params)) {
+    console.error('Hash verification failed. Params:', JSON.stringify(params));
     return NextResponse.json({ status: 'error', msg: '签名验证失败' }, { status: 400 });
   }
 
   // 支付成功
   if (params.trade_status === 'OD' || params.trade_status === 'TRADE_SUCCESS') {
-    const orderNo = params.out_trade_no;
+    // 虎皮椒回调的订单号字段是 trade_order_id（我们传过去的），也可能是 out_trade_no
+    const orderNo = params.trade_order_id || params.out_trade_no;
     const xunhuTradeNo = params.trade_no || params.transaction_id || '';
+
+    if (!orderNo) {
+      console.error('No order number in callback params');
+      return NextResponse.json({ status: 'error', msg: '缺少订单号' }, { status: 400 });
+    }
 
     const { createClient } = await import('@supabase/supabase-js');
     const supabase = createClient(
@@ -65,8 +73,7 @@ async function handleCallback(params: Record<string, string>) {
       .from('orders')
       .update({
         status: 'paid',
-        xunhu_trade_no: xunhuTradeNo,
-        paid_at: new Date().toISOString(),
+        payment_no: xunhuTradeNo,
       })
       .eq('order_no', orderNo);
 
@@ -104,7 +111,6 @@ async function handleCallback(params: Record<string, string>) {
         user_id: order.user_id,
         plan_id: order.plan_id,
         status: 'active',
-        started_at: now.toISOString(),
         expires_at: expiresAt,
         interviews_remaining: interviewsRemaining,
       });
@@ -127,11 +133,8 @@ export async function POST(request: NextRequest) {
 
     if (contentType.includes('application/json')) {
       params = await request.json();
-    } else if (contentType.includes('form-data') || contentType.includes('x-www-form-urlencoded')) {
-      const text = await request.text();
-      params = Object.fromEntries(new URLSearchParams(text));
     } else {
-      // 虎皮椒默认可能发form-urlencoded
+      // 虎皮椒默认发form-urlencoded
       const text = await request.text();
       if (text.startsWith('{')) {
         params = JSON.parse(text);
@@ -157,6 +160,7 @@ export async function GET(request: NextRequest) {
     return await handleCallback(params);
   } catch (error) {
     console.error('Payment callback GET error:', error);
-    return NextResponse.json({ status: 'error', msg: 'Internal error' }, { status: 500 });
+    // 支付跳转回来失败时，重定向到首页而不是显示错误
+    return NextResponse.redirect(new URL('/?pay=check', request.url));
   }
 }
