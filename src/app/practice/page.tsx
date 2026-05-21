@@ -36,6 +36,7 @@ function PracticeContent() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [interviewEnded, setInterviewEnded] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
   const [authChecking, setAuthChecking] = useState(false);
   const { user: authUser } = useAuthContext();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -133,14 +134,14 @@ function PracticeContent() {
       const subData = await subRes.json();
       
       if (!subData.canPractice) {
-        // 无权益，跳转到首页定价区
-        router.push('/?pricing=true');
+        // 无权益，显示付费引导
+        setShowPaywall(true);
         setAuthChecking(false);
         return;
       }
 
-      // 3. 扣减面试次数（单次套餐需要扣）
-      if (subData.plan === 'single') {
+      // 3. 扣减面试次数（免费体验和单次套餐需要扣）
+      if (subData.plan === 'free' || subData.plan === 'single') {
         await fetch('/api/subscription/check', { method: 'POST', redirect: 'follow', credentials: 'include', headers: authHeaders });
       }
 
@@ -465,6 +466,34 @@ function PracticeContent() {
       sendMessage();
     }
   };
+
+  // 付费引导弹窗
+  if (showPaywall) {
+    return (
+      <main className="min-h-screen bg-gradient-to-b from-white to-orange-50 dark:from-[#1A1A2E] dark:to-[#252542] py-8 px-6">
+        <div className="max-w-md mx-auto text-center">
+          <div className="text-6xl mb-6">🎯</div>
+          <h2 className="text-2xl font-bold text-[#1F2937] dark:text-white mb-3">
+            免费体验已用完
+          </h2>
+          <p className="text-[#6B7280] dark:text-gray-400 mb-8">
+            你已经体验过一次模拟面试啦！解锁更多练习，让面试紧张不再拖后腿。
+          </p>
+          <div className="space-y-3">
+            <Link href="/?pricing=true" className="block w-full py-3 bg-[#FF6B35] text-white rounded-xl font-medium text-lg hover:bg-[#E55A28] transition-colors">
+              查看套餐 →
+            </Link>
+            <button
+              onClick={() => setShowPaywall(false)}
+              className="block w-full py-3 text-[#6B7280] hover:text-[#1F2937] dark:hover:text-white transition-colors"
+            >
+              返回
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   // 步骤1：选择人格
   if (step === 'select') {
