@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { DIAGNOSTIC_QUESTIONS, TENSION_TYPES, calculateDiagnosticResult } from '@/lib/ai/config';
 import { Button, ProgressIndicator, Card } from '@/components/ui';
-import type { DiagnosticAnswer, TensionLevel } from '@/types';
+import type { TensionLevel } from '@/types';
 
 export default function DiagnosePage() {
   const router = useRouter();
@@ -17,7 +17,6 @@ export default function DiagnosePage() {
     tensionIndex: number;
     scores: Record<TensionLevel, number>;
   } | null>(null);
-  const [isTransitioning, setIsTransitioning] = useState(false);
 
   const currentQuestion = DIAGNOSTIC_QUESTIONS[currentStep];
 
@@ -26,12 +25,10 @@ export default function DiagnosePage() {
     newAnswers[currentStep] = optionIndex;
     setAnswers(newAnswers);
 
-    // 自动进入下一步或完成
     setTimeout(() => {
       if (currentStep < DIAGNOSTIC_QUESTIONS.length - 1) {
         setCurrentStep(prev => prev + 1);
       } else {
-        // 计算结果
         const diagnosticResult = calculateDiagnosticResult(
           newAnswers.filter(a => a !== null).map(a => [a!])
         );
@@ -49,7 +46,6 @@ export default function DiagnosePage() {
     }
   };
 
-  // 重新开始
   const handleRestart = () => {
     setCurrentStep(0);
     setAnswers(new Array(DIAGNOSTIC_QUESTIONS.length).fill(null));
@@ -61,8 +57,6 @@ export default function DiagnosePage() {
     const typeInfo = TENSION_TYPES[result.primaryType];
     const performanceScore = Math.max(40, 100 - result.tensionIndex);
     const scoreLost = result.tensionIndex * 0.6;
-    const adviceLevel = result.tensionIndex <= 35 ? 'low' : result.tensionIndex <= 65 ? 'medium' : 'high';
-    const adviceLevelLabel = adviceLevel === 'low' ? '轻度' : adviceLevel === 'medium' ? '中度' : '重度';
 
     return (
       <main className="min-h-screen bg-gradient-to-b from-white to-orange-50 dark:from-[#1A1A2E] dark:to-[#252542] py-8 px-6">
@@ -91,26 +85,14 @@ export default function DiagnosePage() {
                 <div className="relative w-32 h-32">
                   <svg className="w-full h-full -rotate-[135deg]" viewBox="0 0 100 100">
                     <circle
-                      cx="50"
-                      cy="50"
-                      r="42"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="8"
+                      cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="8"
                       className="text-gray-200 dark:text-gray-700"
-                      strokeDasharray={`${270 * 0.75} ${300}`}
-                      strokeLinecap="round"
+                      strokeDasharray={`${270 * 0.75} ${300}`} strokeLinecap="round"
                     />
                     <circle
-                      cx="50"
-                      cy="50"
-                      r="42"
-                      fill="none"
-                      stroke="url(#resultGradient)"
-                      strokeWidth="8"
+                      cx="50" cy="50" r="42" fill="none" stroke="url(#resultGradient)" strokeWidth="8"
                       strokeDasharray={`${(result.tensionIndex / 100) * 270 * 0.75} ${300}`}
-                      strokeLinecap="round"
-                      className="transition-all duration-1000 ease-out"
+                      strokeLinecap="round" className="transition-all duration-1000 ease-out"
                     />
                     <defs>
                       <linearGradient id="resultGradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -166,26 +148,6 @@ export default function DiagnosePage() {
             </ul>
           </Card>
 
-          {/* 建议 */}
-          <Card variant="highlight" className="mb-6">
-            <div className="flex gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B35] to-[#E55A28] flex items-center justify-center text-white font-medium flex-shrink-0">
-                搭
-              </div>
-              <div>
-                <h3 className="font-semibold text-[#1F2937] dark:text-white mb-1">阿搭的建议</h3>
-                <p className="text-xs text-[#FF6B35] mb-2">紧张程度：{adviceLevelLabel} — 针对你的情况，这些方法最有效</p>
-                <ul className="space-y-2">
-                  {typeInfo.advice[adviceLevel].map((advice, i) => (
-                    <li key={i} className="text-sm text-[#6B7280] dark:text-gray-400 leading-relaxed">
-                      {advice}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </Card>
-
           {/* CTA按钮 */}
           <div className="flex flex-col gap-4">
             <Button size="lg" className="w-full" onClick={handleGoToPractice}>
@@ -217,7 +179,6 @@ export default function DiagnosePage() {
         {/* 对话式问题 */}
         <div className="min-h-[70vh] flex flex-col justify-center">
           <div className="space-y-8">
-            {/* 阿搭头像和消息 */}
             <div className="flex gap-3">
               <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#FF6B35] to-[#E55A28] flex items-center justify-center text-white font-medium flex-shrink-0 animate-float">
                 搭
@@ -236,7 +197,6 @@ export default function DiagnosePage() {
               </div>
             </div>
 
-            {/* 选项 */}
             <div className="space-y-3 ml-15">
               {currentQuestion.options.map((option, index) => (
                 <button
@@ -267,7 +227,6 @@ export default function DiagnosePage() {
               ))}
             </div>
 
-            {/* 跳过按钮 */}
             <div className="text-center">
               <button
                 onClick={() => setCurrentStep(prev => Math.min(prev + 1, DIAGNOSTIC_QUESTIONS.length - 1))}
