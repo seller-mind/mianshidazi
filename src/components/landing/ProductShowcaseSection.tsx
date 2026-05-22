@@ -12,18 +12,18 @@ export function ProductShowcaseSection() {
       tag: '灵魂功能',
     },
     {
-      emoji: '🤖',
-      title: '模拟面试',
-      description: '5种人格可选：温柔鼓励型帮你建立信心，真实模拟型帮你适应节奏，压力挑战型帮你脱敏。',
-      color: 'from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20',
-      tag: '核心功能',
-    },
-    {
       emoji: '💬',
       title: '阿搭陪伴聊天',
       description: '面试前、面试后、等通知焦虑、崩溃时刻——阿搭都在。不是AI客服，是懂行的朋友。',
       color: 'from-pink-50 to-rose-50 dark:from-pink-900/20 dark:to-rose-900/20',
       tag: '情感陪伴',
+    },
+    {
+      emoji: '🤖',
+      title: '模拟面试',
+      description: '5种人格可选：温柔鼓励型帮你建立信心，真实模拟型帮你适应节奏，压力挑战型帮你脱敏。',
+      color: 'from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20',
+      tag: '核心功能',
     },
     {
       emoji: '📊',
@@ -37,7 +37,7 @@ export function ProductShowcaseSection() {
 
   return (
     <section className="py-10 md:py-20 px-4 md:px-6 bg-gradient-to-b from-white to-gray-50 dark:from-[#1A1A2E] dark:to-[#252542]">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         {/* 标题 */}
         <div className="text-center mb-8 md:mb-16">
           <h2 className="text-2xl md:text-4xl font-bold text-[#1F2937] dark:text-white mb-3 md:mb-4">
@@ -53,7 +53,7 @@ export function ProductShowcaseSection() {
           {features.map((feature, index) => (
             <div
               key={index}
-              className={`bg-gradient-to-br ${feature.color} rounded-2xl p-5 md:p-7 border border-gray-100 dark:border-gray-800 hover:shadow-lg transition-shadow relative`}
+              className={`bg-gradient-to-br ${feature.color} rounded-2xl p-6 md:p-8 border border-gray-100 dark:border-gray-800 hover:shadow-lg transition-shadow relative`}
             >
               {/* 标签 */}
               <div className="absolute top-3 right-3 md:top-4 md:right-4">
@@ -62,11 +62,11 @@ export function ProductShowcaseSection() {
                 </span>
               </div>
 
-              <span className="text-3xl md:text-4xl mb-2 md:mb-4 block">{feature.emoji}</span>
-              <h3 className="text-base md:text-lg font-semibold text-[#1F2937] dark:text-white mb-2">
+              <span className="text-4xl md:text-5xl mb-3 md:mb-5 block">{feature.emoji}</span>
+              <h3 className="text-lg md:text-xl font-semibold text-[#1F2937] dark:text-white mb-2 md:mb-3">
                 {feature.title}
               </h3>
-              <p className="text-xs md:text-sm text-[#6B7280] dark:text-gray-400 leading-relaxed">
+              <p className="text-sm md:text-base text-[#6B7280] dark:text-gray-400 leading-relaxed">
                 {feature.description}
               </p>
             </div>
