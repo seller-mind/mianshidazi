@@ -81,7 +81,7 @@ async function recognizeWithSiliconFlow(audioBuffer: Buffer, mimeType: string): 
   const filename = `audio.${ext}`;
 
   const formData = new FormData();
-  formData.append('file', new Blob([audioBuffer], { type: mimeType }), filename);
+  formData.append('file', new Blob([new Uint8Array(audioBuffer)], { type: mimeType }), filename);
   formData.append('model', 'FunAudioLLM/SenseVoiceSmall');
 
   const controller = new AbortController();

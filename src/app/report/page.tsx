@@ -236,7 +236,7 @@ function ReportContent() {
         {/* 分享报告 */}
         <button
           onClick={() => {
-            const shareText = `我刚完成了一次AI模拟面试！表现分${report.actualScore || '?'}分，面试搭子真的有用 mianshidazi.com`;
+            const shareText = `我刚完成了一次AI模拟面试！表现分${report.scores?.actualScore || '?'}分，面试搭子真的有用 mianshidazi.com`;
             if (navigator.share) {
               navigator.share({ title: '我的AI面试报告', text: shareText, url: 'https://www.mianshidazi.com' }).catch(() => {});
             } else {

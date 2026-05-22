@@ -192,13 +192,13 @@ export async function POST(request: NextRequest) {
 
         if (verifyResult.success) {
           await supabase.from('sms_codes').delete().eq('id', record.id);
-          return await loginUser(phone);
+          return await loginUser(phone, body.ref);
         }
 
         // dypns验证失败，尝试本地比対
         if (record.code && record.code === inputCode) {
           await supabase.from('sms_codes').delete().eq('id', record.id);
-          return await loginUser(phone);
+          return await loginUser(phone, body.ref);
         }
 
         return NextResponse.json({ error: '验证码错误', _debug: verifyResult.detail }, { status: 400 });
@@ -207,7 +207,7 @@ export async function POST(request: NextRequest) {
       // 方案2：本地比對验证码
       if (record.code && record.code === inputCode) {
         await supabase.from('sms_codes').delete().eq('id', record.id);
-        return await loginUser(phone);
+        return await loginUser(phone, body.ref);
       }
 
       return NextResponse.json({ error: '验证码错误' }, { status: 400 });
@@ -221,7 +221,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function loginUser(phone: string) {
+async function loginUser(phone: string, ref?: string | null) {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -237,7 +237,7 @@ async function loginUser(phone: string) {
   if (!user) {
     const { data: newUser, error: createErr } = await supabase
       .from('users')
-      .insert({ phone, nickname: generateRandomNickname(), avatar_url: generateDefaultAvatar(), referred_by: body.ref || null })
+      .insert({ phone, nickname: generateRandomNickname(), avatar_url: generateDefaultAvatar(), referred_by: ref || null })
       .select()
       .single();
 
