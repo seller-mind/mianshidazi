@@ -16,9 +16,10 @@ const PRICING_PLANS = [
       '当天无限次模拟面试',
       '面试练习报告',
       '5种面试官人格',
-      '无限语音',
+      '紧张测试',
+      '阿搭聊天',
+      '每天3条语音',
     ],
-    freeNote: '紧张测试 · 阿搭聊天 · 每天3条语音',
     cta: '开始模拟面试',
     popular: false,
   },
@@ -33,9 +34,10 @@ const PRICING_PLANS = [
       '无限次模拟面试',
       '面试练习报告',
       '5种面试官人格',
+      '紧张测试',
+      '阿搭聊天',
       '无限语音',
     ],
-    freeNote: '紧张测试 · 阿搭聊天 · 每天3条语音',
     cta: '开通月卡',
     popular: true,
   },
@@ -50,9 +52,10 @@ const PRICING_PLANS = [
       '无限次模拟面试',
       '面试练习报告',
       '5种面试官人格',
+      '紧张测试',
+      '阿搭聊天',
       '无限语音',
     ],
-    freeNote: '紧张测试 · 阿搭聊天 · 每天3条语音',
     cta: '开通季卡',
     popular: false,
   },
@@ -156,18 +159,16 @@ export function PricingSection() {
                 </span>
               </div>
 
-              <p className="text-xs md:text-sm text-[#6B7280] dark:text-gray-400 mb-3 md:mb-4 leading-relaxed">
+              <div className="space-y-1.5 md:space-y-2 mb-3 md:mb-4">
                 {plan.features.map((f, i) => (
-                  <span key={i}>
-                    {i > 0 && <span className="text-gray-300 dark:text-gray-600 mx-1">·</span>}
-                    {f}
-                  </span>
+                  <div key={i} className="flex items-center gap-2 text-xs md:text-sm text-[#6B7280] dark:text-gray-400">
+                    <svg className="w-3.5 h-3.5 text-[#FF6B35] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>{f}</span>
+                  </div>
                 ))}
-              </p>
-
-              <p className="text-[10px] md:text-xs text-[#9CA3AF] dark:text-gray-500 mb-3 md:mb-4 text-center">
-                {plan.freeNote}
-              </p>
+              </div>
 
               <Button
                 variant={plan.popular ? 'primary' : 'outline'}
