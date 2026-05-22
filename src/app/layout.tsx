@@ -45,6 +45,7 @@ export default function RootLayout({
     <html lang="zh-CN" suppressHydrationWarning>
       <head>
         <link rel="icon" href="/favicon.ico" />
+        <meta name="msvalidate.01" content="ED1A7551D0CE0BB8575D1C4B86A4F3CD" />
       </head>
       <body className="antialiased">
         <AuthProvider>
