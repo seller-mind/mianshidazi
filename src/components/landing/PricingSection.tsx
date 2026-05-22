@@ -156,16 +156,14 @@ export function PricingSection() {
                 </span>
               </div>
 
-              <ul className="space-y-2 md:space-y-3 mb-3 md:mb-4">
-                {plan.features.map((feature, i) => (
-                  <li key={i} className="flex items-start gap-2 text-xs md:text-sm text-[#6B7280] dark:text-gray-400">
-                    <svg className="w-4 h-4 md:w-5 md:h-5 text-[#10B981] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    {feature}
-                  </li>
+              <p className="text-xs md:text-sm text-[#6B7280] dark:text-gray-400 mb-3 md:mb-4 leading-relaxed">
+                {plan.features.map((f, i) => (
+                  <span key={i}>
+                    {i > 0 && <span className="text-gray-300 dark:text-gray-600 mx-1">·</span>}
+                    {f}
+                  </span>
                 ))}
-              </ul>
+              </p>
 
               <p className="text-[10px] md:text-xs text-[#9CA3AF] dark:text-gray-500 mb-3 md:mb-4 text-center">
                 {plan.freeNote}
