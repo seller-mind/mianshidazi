@@ -24,6 +24,10 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  other: {
+    'msvalidate.01': 'ED1A7551D0CE0BB8575D1C4B86A4F3CD',
+    'baidu-site-verification': 'codeva-sYV9FHWxZn',
+  },
 };
 
 export const viewport: Viewport = {
