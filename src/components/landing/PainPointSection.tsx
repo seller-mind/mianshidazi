@@ -91,18 +91,7 @@ export function PainPointSection() {
           </Link>
         </div>
 
-        {/* 阿搭对话气泡 */}
-        <div className="mt-8 md:mt-12 flex gap-3 md:gap-4 max-w-lg mx-auto">
-          <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-[#FF6B35] to-[#E55A28] flex items-center justify-center text-white text-xs md:text-sm font-medium flex-shrink-0">
-            搭
-          </div>
-          <div className="bg-[#F9FAFB] dark:bg-[#252542] rounded-2xl rounded-tl-md p-3 md:p-4 shadow-lg">
-            <p className="text-xs md:text-sm text-[#6B7280] dark:text-gray-400 leading-relaxed" style={{ whiteSpace: 'pre-wrap' }}>
-              "紧张不是你的敌人，是你的信号。
-              问题是，你一直没学会怎么跟它相处。"
-            </p>
-          </div>
-        </div>
+
       </div>
     </section>
   );

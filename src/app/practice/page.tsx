@@ -565,9 +565,12 @@ function PracticeContent() {
               <p className="text-xs text-gray-500">AI模拟面试中</p>
             </div>
           </div>
-          {!interviewEnded && (
-            <Button variant="ghost" size="sm" onClick={endInterview}>结束面试</Button>
-          )}
+          {!interviewEnded ? (
+            <div className="flex items-center gap-2">
+              <a href="/" className="text-xs text-gray-400 hover:text-[#FF6B35] transition-colors">返回</a>
+              <Button variant="ghost" size="sm" onClick={endInterview}>结束面试</Button>
+            </div>
+          ) : null}
         </div>
       </header>
 

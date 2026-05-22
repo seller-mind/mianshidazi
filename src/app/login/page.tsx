@@ -88,12 +88,26 @@ export default function LoginPage() {
               onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
               placeholder="请输入11位手机号" maxLength={11} style={inputStyle} />
 
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '16px' }}>
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={e => setAgreed(e.target.checked)}
+                style={{ marginTop: '3px', width: '16px', height: '16px', accentColor: '#FF6B35' }}
+              />
+              <span style={{ fontSize: '12px', color: '#6B7280', lineHeight: '1.5' }}>
+                登录即表示您同意
+                <a href="/privacy" target="_blank" style={{ color: '#FF6B35', textDecoration: 'none' }}>《隐私政策》</a>
+                和
+                <a href="/terms" target="_blank" style={{ color: '#FF6B35', textDecoration: 'none' }}>《用户协议》</a>
+              </span>
+            </div>
             <button onClick={handleSendCode} disabled={loading || phone.length !== 11 || !agreed}
               style={{
                 width: '100%', padding: '16px', borderRadius: '12px', border: 'none',
-                backgroundColor: phone.length === 11 && !loading ? '#FF6B35' : '#D1D5DB',
+                backgroundColor: phone.length === 11 && agreed && !loading ? '#FF6B35' : '#D1D5DB',
                 color: '#FFFFFF', fontSize: '18px', fontWeight: 600,
-                cursor: phone.length === 11 && !loading ? 'pointer' : 'default',
+                cursor: phone.length === 11 && agreed && !loading ? 'pointer' : 'default',
               }}>
               {loading ? '发送中...' : '获取验证码'}
             </button>
@@ -119,22 +133,7 @@ export default function LoginPage() {
                 {countdown > 0 ? `${countdown}s` : '重发'}
               </button>
             </div>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '16px' }}>
-              <input
-                type="checkbox"
-                checked={agreed}
-                onChange={e => setAgreed(e.target.checked)}
-                style={{ marginTop: '3px', width: '16px', height: '16px', accentColor: '#FF6B35' }}
-              />
-              <span style={{ fontSize: '12px', color: '#6B7280', lineHeight: '1.5' }}>
-                登录即表示您同意
-                <a href="/privacy" target="_blank" style={{ color: '#FF6B35', textDecoration: 'none' }}>《隐私政策》</a>
-                和
-                <a href="/terms" target="_blank" style={{ color: '#FF6B35', textDecoration: 'none' }}>《用户协议》</a>
-                ，包括数据存储在海外服务器的说明
-              </span>
-            </div>
-            <button onClick={handleVerify} disabled={loading || smsCode.length !== 6 || !agreed}
+            <button onClick={handleVerify} disabled={loading || smsCode.length !== 6}
               style={{
                 width: '100%', padding: '16px', borderRadius: '12px', border: 'none',
                 backgroundColor: smsCode.length === 6 && !loading ? '#FF6B35' : '#D1D5DB',

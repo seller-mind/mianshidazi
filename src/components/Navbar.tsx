@@ -92,7 +92,7 @@ export function Navbar() {
             </div>
           ) : (
             <Link
-              href="/login"
+              href="/login?return=/practice"
               style={{
                 padding: '8px 16px',
                 backgroundColor: '#FF6B35',
@@ -159,7 +159,7 @@ export function Navbar() {
             </>
           ) : (
             <Link
-              href="/login"
+              href="/login?return=/practice"
               style={{
                 padding: '4px 10px',
                 backgroundColor: '#FF6B35',
