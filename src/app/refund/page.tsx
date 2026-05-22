@@ -23,7 +23,7 @@ export default function RefundPage() {
 
       <h2>二、退款条件与期限</h2>
       
-      <h3>2.1 单次体验（9.9元）</h3>
+      <h3>2.1 日卡畅练（9.9元）</h3>
       <table className="w-full border-collapse border border-gray-300 dark:border-gray-600 my-4">
         <thead>
           <tr className="bg-gray-100 dark:bg-gray-800">

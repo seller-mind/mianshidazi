@@ -355,7 +355,7 @@ export default function CompanionPage() {
       <header className="bg-[#252542] border-b border-gray-800 px-4 py-3">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF6B35] to-[#E55A28] flex items-center justify-center text-white font-bold text-sm">阿</div>
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF6B35] to-[#E55A28] flex items-center justify-center text-white font-bold text-sm">搭</div>
             <div>
               <p className="font-medium text-white text-sm">阿搭</p>
               <p className="text-xs text-green-400">在线 · 随时都在</p>
@@ -510,7 +510,7 @@ export default function CompanionPage() {
           <div className="bg-[#2A2A45] rounded-2xl p-6 max-w-sm w-full text-center">
             <div className="text-4xl mb-3">🔊</div>
             <h3 className="text-white font-bold text-lg mb-2">今日免费朗读已用完</h3>
-            <p className="text-gray-400 text-sm mb-5">免费用户每天可听10条AI朗读，文字聊天不限。升级套餐朗读无限用。</p>
+            <p className="text-gray-400 text-sm mb-5">免费用户每天可听5条AI朗读，文字聊天不限。升级套餐朗读无限用。</p>
             <div className="flex gap-3">
               <button
                 onClick={() => { setShowTtsPaywall(false); setTtsLimitHit(false); }}
@@ -560,7 +560,7 @@ export default function CompanionPage() {
           </div>
           <p className="text-xs text-gray-500 mt-2 text-center">
             {voiceRemaining >= 0 
-              ? `文字不限 · 语音${voiceRemaining}/${voiceLimit} · 朗读${ttsRemaining >= 0 ? `${ttsRemaining}/10` : '无限'}` 
+              ? `文字不限 · 语音${voiceRemaining}/${voiceLimit} · 朗读${ttsRemaining >= 0 ? `${ttsRemaining}/5` : '无限'}` 
               : '阿搭 24小时在线，随时陪你聊天'}
           </p>
         </div>

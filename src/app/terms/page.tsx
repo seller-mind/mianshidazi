@@ -20,7 +20,7 @@ export default function TermsPage() {
         <li>AI面试紧张类型测试</li>
         <li>AI模拟面试练习</li>
         <li>AI面试官对话模拟</li>
-        <li>面试紧张心理陪伴和建议</li>
+        <li>面试紧张心理陪伴</li>
         <li>个性化面试报告生成</li>
       </ul>
 

@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { createClient } from '@supabase/supabase-js';
 
-const FREE_TTS_DAILY_LIMIT = 10;
+const FREE_TTS_DAILY_LIMIT = 5;
 
 function getToken(request: NextRequest): string | null {
   let token = request.cookies.get('msd_token')?.value;
