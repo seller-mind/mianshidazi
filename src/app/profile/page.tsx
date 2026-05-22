@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -44,6 +44,8 @@ export default function ProfilePage() {
   const [editingNickname, setEditingNickname] = useState(false);
   const [newNickname, setNewNickname] = useState('');
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchProfile();
@@ -140,6 +142,56 @@ export default function ProfilePage() {
     }
   };
 
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Client-side validation
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('仅支持 PNG/JPG/WebP/GIF 格式');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      alert('图片不能超过2MB');
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const token = localStorage.getItem('msd_token');
+      const formData = new FormData();
+      formData.append('avatar', file);
+
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch('/api/user/avatar', {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setUser(prev => prev ? { ...prev, avatar_url: data.avatar_url + '?t=' + Date.now() } : null);
+      } else {
+        const data = await res.json();
+        alert(data.message || '头像上传失败');
+      }
+    } catch {
+      alert('头像上传失败，请重试');
+    } finally {
+      setUploadingAvatar(false);
+      // Reset file input so the same file can be re-selected
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     localStorage.removeItem('msd_token');
@@ -178,13 +230,35 @@ export default function ProfilePage() {
 
         {/* 头像+昵称区 */}
         <div className="text-center mb-6">
-          <div className="w-20 h-20 rounded-full mx-auto mb-3 overflow-hidden bg-gray-100 flex items-center justify-center">
+          <div
+            className="relative w-20 h-20 rounded-full mx-auto mb-3 overflow-hidden bg-gray-100 flex items-center justify-center cursor-pointer group"
+            onClick={handleAvatarClick}
+          >
             {user.avatar_url ? (
               <img src={user.avatar_url} alt="头像" className="w-full h-full object-cover" />
             ) : (
               <span className="text-3xl">😊</span>
             )}
+            {/* Hover overlay */}
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              {uploadingAvatar ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              )}
+            </div>
           </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            onChange={handleAvatarChange}
+            className="hidden"
+          />
+          <p className="text-xs text-gray-400 -mt-1 mb-1">点击头像可更换</p>
           {editingNickname ? (
             <div className="flex gap-2 justify-center mt-2">
               <input
@@ -247,7 +321,7 @@ export default function ProfilePage() {
                 今日语音：<span className="font-medium">{Math.max(0, 3 - (user.free_voice_used || 0))}</span> / 3 条（文字不限）
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                今日朗读：<span className="font-medium">{Math.max(0, 10 - (user.free_tts_used || 0))}</span> / 10 条
+                今日朗读：<span className="font-medium">{Math.max(0, 5 - (user.free_tts_used || 0))}</span> / 5 条
               </p>
               <Link href="/pricing" className="inline-block mt-3 px-4 py-2 bg-[#FF6B35] text-white text-sm rounded-lg hover:bg-[#E55A28] transition-colors">
                 购买套餐
