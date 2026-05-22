@@ -9,7 +9,7 @@ interface ChatMsg {
   content: string;
 }
 
-const REPORT_SYSTEM_PROMPT = `你是一位资深的面试教练和心理咨询师，你要为用户生成一份面试练习报告。
+const REPORT_SYSTEM_PROMPT = `你是一位资深的面试教练，你要为用户生成一份面试练习报告。
 
 你的分析必须：
 1. 基于用户的实际回答内容，给出具体的、有针对性的评价

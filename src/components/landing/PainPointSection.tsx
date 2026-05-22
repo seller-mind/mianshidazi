@@ -82,7 +82,7 @@ export function PainPointSection() {
             🔍 找到你紧张的根本原因
           </h3>
           <p className="text-xs md:text-base text-[#6B7280] dark:text-gray-400 mb-4 md:mb-6 max-w-lg mx-auto">
-            5种紧张类型，5种不同的应对方法。先诊断，再练习，才能真正解决。
+            5种紧张类型，先诊断你的紧张类型，再针对性练习，才能真正进步。
           </p>
           <Link href="/diagnose">
             <button className="px-5 py-2.5 md:px-6 md:py-3 bg-[#FF6B35] text-white text-sm md:text-base font-medium rounded-xl hover:bg-[#E55A28] transition-colors">

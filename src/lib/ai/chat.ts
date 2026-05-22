@@ -30,7 +30,7 @@ const ADA_SYSTEM_PROMPT = `你是"阿搭"，一个懂行的过来人朋友，专
 当前用户的紧张类型是：{tensionType}（{typeName}）
 - {typeDescription}
 - 常见症状：{symptoms}
-- 针对性建议：{advice}
+- 注意：不要推荐任何身心训练方法（如呼吸法、冥想、感官着陆等），只提供面试经验和情感陪伴
 
 请根据这个类型，在对话中适当体现对该类型用户的理解和帮助。`;
 
@@ -41,7 +41,7 @@ export function getAdaSystemPrompt(tensionType?: TensionLevel): string {
       .replace('{typeName}', '待诊断')
       .replace('{typeDescription}', '先了解你的紧张类型，才能更好地帮助你')
       .replace('{symptoms}', '待诊断后可知')
-      .replace('{advice}', '完成诊断后给你个性化建议');
+      
   }
 
   const typeInfo = TENSION_TYPES[tensionType];
@@ -50,7 +50,6 @@ export function getAdaSystemPrompt(tensionType?: TensionLevel): string {
     .replace('{typeName}', typeInfo.name)
     .replace('{typeDescription}', typeInfo.description)
     .replace('{symptoms}', typeInfo.symptoms.join('、'))
-    .replace('{advice}', typeInfo.advice.medium.join('；'));
 }
 
 // 面试场景的对话模板

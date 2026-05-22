@@ -8,7 +8,7 @@ export function ProductShowcaseSection() {
     {
       emoji: '🔬',
       title: '紧张类型测试',
-      description: '5种紧张类型，精准定位你的问题根源。不是泛泛的"放松点"，是针对性的解决方案。',
+      description: '5种紧张类型，精准定位你的问题根源。了解你的紧张类型，才能更有针对性地练习。',
       color: 'from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20',
       tag: '灵魂功能',
     },

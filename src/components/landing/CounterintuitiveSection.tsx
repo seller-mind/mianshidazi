@@ -7,8 +7,8 @@ export function CounterintuitiveSection() {
       icon: '🤯',
       title: '紧张不是你的敌人',
       subtitle: '是信号',
-      content: '研究发现，紧张和兴奋是同一种身体反应。区别只在于你怎么解读它。把"我好紧张"换成"我好兴奋"，表现会显著提升。',
-      source: '心理学研究',
+      content: '紧张说明你在乎这件事，在乎的事情才有可能做好。面试官也紧张——他怕招到不合适的人。',
+      source: '有机构研究',
     },
     {
       icon: '🎯',

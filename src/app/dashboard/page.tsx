@@ -159,7 +159,7 @@ export default function DashboardPage() {
               <div className="text-4xl">👑</div>
               <div className="flex-1">
                 <p className="font-semibold text-[#1F2937] dark:text-white">升级会员</p>
-                <p className="text-sm text-[#6B7280]">解锁无限次练习 + 专属训练</p>
+                <p className="text-sm text-[#6B7280]">解锁无限次模拟面试</p>
               </div>
               <Link href="/#pricing">
                 <Button size="sm">了解详情</Button>
