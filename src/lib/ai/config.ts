@@ -158,6 +158,12 @@ export const DIAGNOSTIC_QUESTIONS = [
 ];
 
 // 计算诊断结果
+// 各类型理论最高得分（每题该类型选项最高分之和）
+const TYPE_MAX_SCORES: Record<DiagnosticTensionType, number> = { A: 14, B: 15, C: 14, D: 16, E: 17 };
+// 总分理论范围（所有题最低选项总分之和 ~ 最高选项总分之和）
+const MIN_TOTAL_SCORE = 17;
+const MAX_TOTAL_SCORE = 59;
+
 export function calculateDiagnosticResult(answers: number[][]): {
   primaryType: DiagnosticTensionType;
   tensionIndex: number;
@@ -183,10 +189,14 @@ export function calculateDiagnosticResult(answers: number[][]): {
   const maxScore = Math.max(...Object.values(scores));
   const primaryType = (Object.entries(scores).find(([_, v]) => v === maxScore)?.[0] || 'A') as DiagnosticTensionType;
 
-  // 计算紧张指数 (基于总分)
+  // 计算紧张指数：综合"该类型强度"和"整体紧张程度"
+  // typeIntensity = primaryType得分 / 该类型理论最高分 (0~1)
+  // overallTension = (总分 - 最低分) / (最高分 - 最低分) (0~1)
+  // tensionIndex = 加权综合，限制在15~95区间
+  const typeIntensity = scores[primaryType] / TYPE_MAX_SCORES[primaryType];
   const totalScore = Object.values(scores).reduce((a, b) => a + b, 0);
-  const maxPossibleScore = DIAGNOSTIC_QUESTIONS.length * 3;
-  const tensionIndex = Math.min(100, Math.round((totalScore / maxPossibleScore) * 100));
+  const overallTension = (totalScore - MIN_TOTAL_SCORE) / (MAX_TOTAL_SCORE - MIN_TOTAL_SCORE);
+  const tensionIndex = Math.max(15, Math.min(95, Math.round(typeIntensity * 40 + overallTension * 60)));
 
   return { primaryType, tensionIndex, scores };
 }

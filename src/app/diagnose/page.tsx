@@ -55,8 +55,12 @@ export default function DiagnosePage() {
 
   if (isComplete && result) {
     const typeInfo = TENSION_TYPES[result.primaryType];
-    const performanceScore = Math.max(40, 100 - result.tensionIndex);
-    const scoreLost = result.tensionIndex * 0.6;
+    // 面试表现分：紧张越低表现越好（45~88区间）
+    const performanceScore = Math.max(45, Math.min(88, Math.round(92 - result.tensionIndex * 0.5)));
+    // 紧张偷走的分数
+    const scoreLost = Math.round(result.tensionIndex * 0.22);
+    // 真实水平 = 表现分 + 紧张偷走的分数
+    const realLevel = Math.min(100, performanceScore + scoreLost);
 
     return (
       <main className="min-h-screen bg-gradient-to-b from-white to-orange-50 dark:from-[#1A1A2E] dark:to-[#252542] py-8 px-6">
@@ -113,10 +117,10 @@ export default function DiagnosePage() {
                 <div>
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-[#6B7280]">你的真实水平</span>
-                    <span className="font-medium text-[#1F2937] dark:text-white">{100 - Math.round(scoreLost)}分</span>
+                    <span className="font-medium text-[#1F2937] dark:text-white">{realLevel}分</span>
                   </div>
                   <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                    <div className="h-full bg-green-500 rounded-full" style={{ width: `${100 - scoreLost}%` }} />
+                    <div className="h-full bg-green-500 rounded-full" style={{ width: `${realLevel}%` }} />
                   </div>
                 </div>
                 <div>
