@@ -7,7 +7,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const DASHSCOPE_API_KEY = process.env.DASHSCOPE_API_KEY;
 const TTS_URL = 'https://dashscope.aliyuncs.com/api/v1/services/audio/tts/SpeechSynthesizer';
-const FREE_TTS_DAILY_LIMIT = 10;
+const FREE_TTS_DAILY_LIMIT = 5;
 
 const PERSONA_VOICE: Record<string, string> = {
   A: 'longanwen_v3',

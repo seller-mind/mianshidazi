@@ -139,7 +139,7 @@ ${conversationText}
 
 请严格按JSON格式输出报告。`;
 
-    // 调用qwen-max生成高质量报告
+    // 调用qwen-plus生成报告（降成本，qwen-max作为fallback）
     const response = await fetch(API_ENDPOINT, {
       method: 'POST',
       headers: {
@@ -147,7 +147,7 @@ ${conversationText}
         'Authorization': `Bearer ${DASHSCOPE_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'qwen-max',
+        model: 'qwen-plus',
         messages: [
           { role: 'system', content: REPORT_SYSTEM_PROMPT },
           { role: 'user', content: userPrompt },
@@ -160,7 +160,7 @@ ${conversationText}
     if (!response.ok) {
       const errText = await response.text();
       console.error('[Report] API error:', response.status, errText);
-      // fallback到qwen-plus
+      // fallback到qwen-max
       return await generateWithFallback(messages, conversationText);
     }
 
@@ -219,7 +219,7 @@ ${conversationText}
   }
 }
 
-// fallback用qwen-plus
+// fallback用qwen-max
 async function generateWithFallback(messages: ChatMsg[], conversationText: string) {
   try {
     const userPrompt = `以下是用户的一次模拟面试对话记录，请分析并生成报告：\n\n${conversationText}\n\n请严格按JSON格式输出报告。`;
@@ -231,7 +231,7 @@ async function generateWithFallback(messages: ChatMsg[], conversationText: strin
         'Authorization': `Bearer ${DASHSCOPE_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'qwen-plus',
+        model: 'qwen-max',
         messages: [
           { role: 'system', content: REPORT_SYSTEM_PROMPT },
           { role: 'user', content: userPrompt },
