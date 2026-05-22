@@ -183,10 +183,12 @@ export function PricingSection() {
         </div>
 
         <div className="mt-8 md:mt-12 text-center">
-          <p className="text-xs md:text-sm text-[#9CA3AF]">
-            先免费做诊断，再决定要不要练。
-            <Link href="/diagnose" className="text-[#FF6B35] hover:underline ml-1">
-              免费诊断 →
+          <p className="text-xs md:text-sm text-[#6B7280] dark:text-gray-400">
+            紧张测试和阿搭聊天<span className="text-[#FF6B35] font-medium">永久免费</span>，只有模拟面试收费
+          </p>
+          <p className="text-[10px] md:text-xs text-[#9CA3AF] dark:text-gray-500 mt-1">
+            <Link href="/diagnose" className="hover:text-[#FF6B35] transition-colors">
+              先免费测紧张类型 →
             </Link>
           </p>
         </div>

@@ -49,11 +49,11 @@ export function ProductShowcaseSection() {
         </div>
 
         {/* 功能卡片 */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5">
           {features.map((feature, index) => (
             <div
               key={index}
-              className={`bg-gradient-to-br ${feature.color} rounded-2xl p-4 md:p-6 border border-gray-100 dark:border-gray-800 hover:shadow-lg transition-shadow relative`}
+              className={`bg-gradient-to-br ${feature.color} rounded-xl p-3 md:p-5 border border-gray-100 dark:border-gray-800 hover:shadow-lg transition-shadow relative`}
             >
               {/* 标签 */}
               <div className="absolute top-3 right-3 md:top-4 md:right-4">
@@ -62,11 +62,11 @@ export function ProductShowcaseSection() {
                 </span>
               </div>
 
-              <span className="text-2xl md:text-3xl mb-2 md:mb-4 block">{feature.emoji}</span>
-              <h3 className="text-base md:text-lg font-semibold text-[#1F2937] dark:text-white mb-1.5 md:mb-2">
+              <span className="text-xl md:text-2xl mb-1.5 md:mb-3 block">{feature.emoji}</span>
+              <h3 className="text-sm md:text-base font-semibold text-[#1F2937] dark:text-white mb-1 md:mb-1.5">
                 {feature.title}
               </h3>
-              <p className="text-xs md:text-sm text-[#6B7280] dark:text-gray-400 leading-relaxed">
+              <p className="text-[10px] md:text-xs text-[#6B7280] dark:text-gray-400 leading-relaxed">
                 {feature.description}
               </p>
             </div>
