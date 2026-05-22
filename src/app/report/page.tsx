@@ -2,26 +2,69 @@
 
 import { Suspense, useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Button, Card } from '@/components/ui';
 import { TENSION_TYPES } from '@/lib/ai/config';
 import type { TensionLevel, InterviewReport } from '@/types';
 
 function ReportContent() {
+  const searchParams = useSearchParams();
+  const sessionId = searchParams.get('session_id');
   const [report, setReport] = useState<InterviewReport | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 从localStorage读取真实报告
-    const stored = localStorage.getItem('msd_report');
-    if (stored) {
+    (async () => {
       try {
-        setReport(JSON.parse(stored));
+        const token = localStorage.getItem('msd_token');
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        if (sessionId) {
+          const res = await fetch(`/api/report/get?session_id=${sessionId}`, { headers });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.report?.report_data) {
+              setReport(data.report.report_data);
+              localStorage.setItem('msd_report', JSON.stringify(data.report.report_data));
+              setLoading(false);
+              return;
+            }
+          }
+        }
+
+        if (!sessionId) {
+          const res = await fetch('/api/report/get', { headers });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.reports?.length > 0 && data.reports[0].session_id) {
+              const res2 = await fetch(`/api/report/get?session_id=${data.reports[0].session_id}`, { headers });
+              if (res2.ok) {
+                const data2 = await res2.json();
+                if (data2.report?.report_data) {
+                  setReport(data2.report.report_data);
+                  localStorage.setItem('msd_report', JSON.stringify(data2.report.report_data));
+                  setLoading(false);
+                  return;
+                }
+              }
+            }
+          }
+        }
+
+        const stored = localStorage.getItem('msd_report');
+        if (stored) {
+          try { setReport(JSON.parse(stored)); } catch {}
+        }
       } catch {
-        // 数据损坏
+        const stored = localStorage.getItem('msd_report');
+        if (stored) {
+          try { setReport(JSON.parse(stored)); } catch {}
+        }
       }
-    }
-    setLoading(false);
-  }, []);
+      setLoading(false);
+    })();
+  }, [sessionId]);
 
   if (loading) {
     return (
@@ -71,7 +114,6 @@ function ReportContent() {
           返回首页
         </Link>
 
-        {/* 一句话总结 */}
         <div className="bg-gradient-to-r from-[#FF6B35] to-[#E55A28] rounded-2xl p-6 text-white mb-6 text-center">
           <div className="text-4xl mb-3">🎯</div>
           <h1 className="text-2xl font-bold mb-2">面试练习报告</h1>
@@ -80,7 +122,6 @@ function ReportContent() {
           </p>
         </div>
 
-        {/* 分数对比 */}
         <Card className="mb-6">
           <h2 className="text-lg font-semibold text-[#1F2937] dark:text-white mb-4">📊 分数对比</h2>
           <div className="space-y-4">
@@ -111,7 +152,6 @@ function ReportContent() {
           </div>
         </Card>
 
-        {/* 亮点 */}
         {report.highlights && report.highlights.length > 0 && (
           <Card className="mb-6">
             <h2 className="text-lg font-semibold text-[#1F2937] dark:text-white mb-4">✨ 你本来就很厉害</h2>
@@ -129,7 +169,6 @@ function ReportContent() {
           </Card>
         )}
 
-        {/* 紧张损失 */}
         {report.tensionLosses && report.tensionLosses.length > 0 && (
           <Card variant="highlight" className="mb-6">
             <h2 className="text-lg font-semibold text-[#1F2937] dark:text-white mb-4">😰 紧张偷走了你的分数</h2>
@@ -147,7 +186,6 @@ function ReportContent() {
           </Card>
         )}
 
-        {/* 紧张类型 */}
         {typeInfo && (
           <Card className="mb-6">
             <h2 className="text-lg font-semibold text-[#1F2937] dark:text-white mb-4">🧠 你的紧张类型</h2>
@@ -166,7 +204,6 @@ function ReportContent() {
           </Card>
         )}
 
-        {/* 建议 */}
         {report.suggestions && report.suggestions.length > 0 && (
           <Card className="mb-6">
             <h2 className="text-lg font-semibold text-[#1F2937] dark:text-white mb-4">🛠 下一步练习建议</h2>
@@ -184,7 +221,6 @@ function ReportContent() {
           </Card>
         )}
 
-        {/* 阿搭寄语 */}
         {report.adaMessage && (
           <Card variant="highlight" className="mb-6">
             <div className="flex gap-3">
@@ -197,7 +233,6 @@ function ReportContent() {
           </Card>
         )}
 
-        {/* CTA */}
         <div className="flex flex-col gap-4">
           <Link href="/practice">
             <Button size="lg" className="w-full">再来一次练习 →</Button>
@@ -217,8 +252,8 @@ export default function ReportPage() {
       <main className="min-h-screen bg-gradient-to-b from-white to-orange-50 dark:from-[#1A1A2E] dark:to-[#252542] py-8 px-6">
         <div className="max-w-2xl mx-auto text-center">
           <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mx-auto mb-4"></div>
-            <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mx-auto mb-4" />
+            <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded" />
           </div>
         </div>
       </main>

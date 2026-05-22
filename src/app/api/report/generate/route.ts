@@ -1,5 +1,7 @@
 // 面试报告生成API v2 - 调用大模型生成高质量个性化报告
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import jwt from 'jsonwebtoken';
 
 const DASHSCOPE_API_KEY = process.env.DASHSCOPE_API_KEY;
 const API_ENDPOINT = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
@@ -9,6 +11,74 @@ interface ChatMsg {
   content: string;
 }
 
+
+function getToken(request: NextRequest): string | null {
+  let token = request.cookies.get('msd_token')?.value;
+  if (!token) {
+    const authHeader = request.headers.get('authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+      token = authHeader.slice(7);
+    }
+  }
+  return token || null;
+}
+
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
+
+async function saveReportToDB(userId: string, sessionId: string | undefined, report: any) {
+  try {
+    const supabase = getSupabase();
+    if (sessionId) {
+      const { data: existingSession } = await supabase
+        .from('interview_sessions')
+        .select('session_id')
+        .eq('session_id', sessionId)
+        .single();
+      if (!existingSession) {
+        const { data: chatSession } = await supabase
+          .from('chat_sessions')
+          .select('persona, type')
+          .eq('id', sessionId)
+          .single();
+        await supabase.from('interview_sessions').insert({
+          session_id: sessionId,
+          user_id: userId,
+          type: 'interview',
+          persona: chatSession?.persona || report.tensionDiagnosis?.type || 'A',
+        });
+      }
+    }
+    const reportRow: Record<string, any> = {
+      session_id: sessionId || null,
+      user_id: userId,
+      report_data: report,
+      summary: report.summary || null,
+      actual_score: report.overallScore ?? report.scores?.actualScore ?? null,
+      real_level: report.realLevel ?? report.scores?.realLevel ?? null,
+      tension_lost: report.tensionLost ?? report.scores?.tensionLost ?? null,
+      highlights: report.highlights || null,
+      tension_losses: report.tensionLosses || null,
+      tension_diagnosis: report.tensionDiagnosis || null,
+      suggestions: report.suggestions || null,
+      ada_message: report.adaMessage || null,
+    };
+    const { error } = await supabase
+      .from('interview_reports')
+      .upsert(reportRow, { onConflict: 'session_id' });
+    if (error) {
+      console.error('[Report] Save to DB failed:', error);
+    } else {
+      console.log('[Report] Saved to DB, session_id:', sessionId);
+    }
+  } catch (err) {
+    console.error('[Report] Save to DB error:', err);
+  }
+}
 const REPORT_SYSTEM_PROMPT = `你是一位资深的面试教练，你要为用户生成一份面试练习报告。
 
 你的分析必须：
@@ -52,7 +122,7 @@ const REPORT_SYSTEM_PROMPT = `你是一位资深的面试教练，你要为用�
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { messages } = body;
+    const { messages, sessionId } = body;
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json({ error: '缺少对话数据' }, { status: 400 });
@@ -131,6 +201,16 @@ ${conversationText}
       tensionIndex: report.tensionIndex,
       suggestions: (report.suggestions || []).map((s: {title: string}) => s.title),
     };
+
+    const token = getToken(request);
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
+        await saveReportToDB(decoded.userId, sessionId, report);
+      } catch {
+        // Token验证失败，仍然返回报告但不保存
+      }
+    }
 
     return NextResponse.json({ success: true, data: report });
   } catch (error) {

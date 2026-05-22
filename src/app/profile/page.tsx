@@ -36,7 +36,7 @@ const PLAN_BADGE_COLORS: Record<string, string> = {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [user, setUser] = useState<{ id: string; phone?: string; nickname?: string; avatar_url?: string; free_interviews_used?: number } | null>(null);
+  const [user, setUser] = useState<{ id: string; phone?: string; nickname?: string; avatar_url?: string; free_interviews_used?: number; free_voice_used?: number; free_tts_used?: number } | null>(null);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [sessions, setSessions] = useState<{id: string; type: string; title: string; created_at: string; updated_at: string}[]>([]);
@@ -275,9 +275,14 @@ export default function ProfilePage() {
                     }`}>
                       {session.type === 'interview' ? '面试' : '聊天'}
                     </span>
+                    <div className="flex items-center gap-3">
+                    <Link href={`/report?session_id=${session.id}`} className="text-xs text-blue-500 hover:underline">
+                      报告
+                    </Link>
                     <Link href={session.type === 'interview' ? '/practice' : '/companion'} className="text-xs text-[#FF6B35] hover:underline">
                       继续 →
                     </Link>
+                  </div>
                   </div>
                 </div>
               ))}

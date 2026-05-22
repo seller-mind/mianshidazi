@@ -103,8 +103,9 @@ function PracticeContent() {
                 setSelectedPersona(latest.persona as PersonaType);
                 setMessages(msgs);
                 setStep('interview');
-                setInterviewEnded(true); // 之前的面试已结束
+                setInterviewEnded(false); // 允许用户继续面试
                 setRestoringHistory(false);
+                ensureInterviewSession(latest.id, latest.persona as PersonaType);
                 return;
               }
             }
@@ -154,6 +155,21 @@ function PracticeContent() {
     }
   }, [sessionId, selectedPersona]);
 
+
+  const ensureInterviewSession = useCallback(async (sid: string, personaKey: PersonaType) => {
+    try {
+      const token = localStorage.getItem('msd_token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      await fetch('/api/interview-session', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ session_id: sid, persona: personaKey }),
+      });
+    } catch {
+      // ignore
+    }
+  }, []);
   // 滚动到底部
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -212,6 +228,7 @@ function PracticeContent() {
       }
 
       setStep('interview');
+      ensureInterviewSession(sessionId, selectedPersona);
       
       let intro = '';
       switch (selectedPersona) {
@@ -513,6 +530,10 @@ function PracticeContent() {
               <span className="text-sm">💡</span>
               <span className="text-xs md:text-sm text-amber-700 dark:text-amber-400">第一次？推荐选「温柔鼓励型」，先找找感觉</span>
             </div>
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-full mt-2">
+              <span className="text-sm">🎁</span>
+              <span className="text-xs md:text-sm text-green-700 dark:text-green-400">每人1次免费体验机会，紧张测试和阿搭聊天完全免费</span>
+            </div>
           </div>
           <div className="space-y-4">
             {(Object.entries(PERSONA_CONFIGS) as [PersonaType, typeof PERSONA_CONFIGS['A']][]).map(([key, config]) => (
@@ -667,7 +688,6 @@ function PracticeContent() {
               {voiceRemaining >= 0 && (
                 <span className="text-xs text-gray-400 mt-1">语音 {voiceRemaining}/{voiceLimit} · 朗读 {ttsRemaining >= 0 ? `${ttsRemaining}/10` : '无限'}</span>
               )}
-            </div>
             </div>
             <div className="flex gap-2 items-center">
               <input
