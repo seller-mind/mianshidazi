@@ -48,7 +48,8 @@ export default function LoginPage() {
       if (data.token) {
         localStorage.setItem('msd_token', data.token);
       }
-      router.push('/practice');
+      const returnUrl = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('return') : null;
+      router.push(returnUrl || '/practice');
     } catch { setError('网络错误'); }
     finally { setLoading(false); }
   };

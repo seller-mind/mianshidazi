@@ -155,7 +155,7 @@ export default function DiagnosePage() {
           {/* CTA按钮 */}
           <div className="flex flex-col gap-4">
             <Button size="lg" className="w-full" onClick={handleGoToPractice}>
-              开始你的第一次AI面试练习
+              开始模拟面试
             </Button>
             <Button variant="ghost" className="w-full" onClick={handleRestart}>
               重新诊断
@@ -231,14 +231,7 @@ export default function DiagnosePage() {
               ))}
             </div>
 
-            <div className="text-center">
-              <button
-                onClick={() => setCurrentStep(prev => Math.min(prev + 1, DIAGNOSTIC_QUESTIONS.length - 1))}
-                className="text-sm text-[#9CA3AF] hover:text-[#6B7280] transition-colors"
-              >
-                跳过这个问题
-              </button>
-            </div>
+
           </div>
         </div>
       </div>

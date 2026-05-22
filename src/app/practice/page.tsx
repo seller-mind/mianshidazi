@@ -658,7 +658,7 @@ function PracticeContent() {
             <div className="flex flex-col items-center mb-2">
               <VoiceInput onVoiceSend={handleVoiceSend} disabled={isLoading || voiceRemaining === 0} />
               {voiceRemaining >= 0 && (
-                <span className="text-xs text-gray-400 mt-1">语音 {voiceRemaining}/{voiceLimit} · 朗读 {ttsRemaining >= 0 ? ttsRemaining : '∞'}/10</span>
+                <span className="text-xs text-gray-400 mt-1">语音 {voiceRemaining}/{voiceLimit} · 朗读 {ttsRemaining >= 0 ? `${ttsRemaining}/10` : '无限'}</span>
               )}
             </div>
             </div>

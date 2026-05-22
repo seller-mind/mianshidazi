@@ -201,40 +201,4 @@ export function calculateDiagnosticResult(answers: number[][]): {
   return { primaryType, tensionIndex, scores };
 }
 
-// 定价方案
-export const PRICING_PLANS = [
-  {
-    id: 'single',
-    name: '单次体验',
-    price: 9.9,
-    features: [
-      '1次AI模拟面试',
-      '个性化面试报告',
-      '紧张类型测试',
-      '24小时有效期',
-    ],
-  },
-  {
-    id: 'monthly',
-    name: '月卡会员',
-    price: 49,
-    originalPrice: 99,
-    isPopular: true,
-    features: [
-      '无限次AI模拟面试',
-      '个性化面试报告',
-      '紧张类型测试',
-    ],
-  },
-  {
-    id: 'quarterly',
-    name: '季卡会员',
-    price: 129,
-    originalPrice: 279,
-    features: [
-      '无限次AI模拟面试',
-      '个性化面试报告',
-      '紧张类型测试',
-    ],
-  },
-];
+// 定价方案已迁移至 PricingSection.tsx

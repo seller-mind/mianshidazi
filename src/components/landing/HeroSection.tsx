@@ -30,7 +30,7 @@ export function HeroSection() {
 
         {/* 副标题 */}
         <p className="text-base md:text-2xl text-[#6B7280] dark:text-gray-400 mb-6 md:mb-10 max-w-xl mx-auto">
-          找个面试搭子，上场不慌
+          免费测紧张类型，先诊断再练习
         </p>
 
         {/* 阿搭角色定位 */}
@@ -55,7 +55,7 @@ export function HeroSection() {
         <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center mb-8 md:mb-12">
           <Link href="/diagnose">
             <Button variant="outline" size="lg" className="w-full sm:w-auto">
-              🔍 紧张类型测试
+              🔍 免费紧张测试
             </Button>
           </Link>
           <Link href="/companion">

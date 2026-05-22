@@ -384,11 +384,11 @@ export default function CompanionPage() {
               <button
                 key={entry.context}
                 onClick={() => {
+                  if (isLoading) return;
                   setContext(entry.context);
-                  setMessages(prev => [...prev, {
-                    id: generateId(), role: 'assistant',
-                    content: `好的，来聊聊"${entry.text}"这个话题。\n\n${getContextIntro(entry.context)}`,
-                  }]);
+                  const userMsg: Message = { id: generateId(), role: 'user', content: entry.text };
+                  setMessages(prev => [...prev, userMsg]);
+                  sendToAI(entry.text, [...messages, userMsg]);
                 }}
                 className="px-3 py-1.5 bg-[#2A2A45] text-gray-300 text-xs rounded-full whitespace-nowrap hover:bg-[#3A3A55] transition-colors"
               >
@@ -560,7 +560,7 @@ export default function CompanionPage() {
           </div>
           <p className="text-xs text-gray-500 mt-2 text-center">
             {voiceRemaining >= 0 
-              ? `文字不限 · 语音${voiceRemaining}/${voiceLimit} · 朗读${ttsRemaining >= 0 ? ttsRemaining : '∞'}/10` 
+              ? `文字不限 · 语音${voiceRemaining}/${voiceLimit} · 朗读${ttsRemaining >= 0 ? `${ttsRemaining}/10` : '无限'}` 
               : '阿搭 24小时在线，随时陪你聊天'}
           </p>
         </div>

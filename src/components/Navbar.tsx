@@ -64,7 +64,7 @@ export function Navbar() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <span style={{ fontSize: '12px', color: '#6B7280' }}>
                 {user?.nickname || user?.phone?.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')}
-                {activePlan && <span style={{ marginLeft: '4px', color: '#FF6B35' }}>· {activePlan === 'single' ? '单次' : activePlan === 'monthly' ? '月卡' : '季卡'}</span>}
+                {activePlan && <span style={{ marginLeft: '4px', color: '#FF6B35' }}>· {activePlan === 'single' ? '日卡' : activePlan === 'monthly' ? '月卡' : '季卡'}</span>}
               </span>
               <Link href="/profile" style={{ textDecoration: 'none' }}>
                 <div style={{
