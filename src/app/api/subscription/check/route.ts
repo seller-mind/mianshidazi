@@ -70,11 +70,11 @@ export async function GET(request: NextRequest) {
 
     // 没有有效订阅 - 检查免费次数
     const freeUsed = user?.free_interviews_used || 0;
-    if (freeUsed < 1) {
+    if (freeUsed < 2) {
       return NextResponse.json({
         canPractice: true,
         plan: 'free',
-        interviewsRemaining: 1 - freeUsed,
+        interviewsRemaining: 2 - freeUsed,
         source: 'free_trial',
       });
     }
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     const freeUsed = user?.free_interviews_used || 0;
-    if (freeUsed >= 1) {
+    if (freeUsed >= 2) {
       return NextResponse.json({ error: '免费次数已用完' }, { status: 403 });
     }
 

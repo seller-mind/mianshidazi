@@ -241,7 +241,7 @@ export default function ProfilePage() {
             <div>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">暂无有效套餐</p>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                免费面试：<span className="font-medium">{Math.max(0, 1 - (user.free_interviews_used || 0))}</span> / 1 次
+                免费面试：<span className="font-medium">{Math.max(0, 2 - (user.free_interviews_used || 0))}</span> / 2 次
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 今日语音：<span className="font-medium">{Math.max(0, 3 - (user.free_voice_used || 0))}</span> / 3 条（文字不限）

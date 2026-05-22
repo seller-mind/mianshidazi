@@ -493,7 +493,7 @@ function PracticeContent() {
         <div className="max-w-md mx-auto text-center">
           <div className="text-6xl mb-6">🎯</div>
           <h2 className="text-2xl font-bold text-[#1F2937] dark:text-white mb-3">免费体验已用完</h2>
-          <p className="text-[#6B7280] dark:text-gray-400 mb-8">你已经体验过一次模拟面试啦！解锁更多练习，让面试紧张不再拖后腿。</p>
+          <p className="text-[#6B7280] dark:text-gray-400 mb-8">你已经用完2次免费体验啦！解锁更多练习，让面试紧张不再拖后腿。</p>
           <div className="space-y-3">
             <Link href="/pricing" className="block w-full py-3 bg-[#FF6B35] text-white rounded-xl font-medium text-lg hover:bg-[#E55A28] transition-colors">查看套餐 →</Link>
             <button onClick={() => setShowPaywall(false)} className="block w-full py-3 text-[#6B7280] hover:text-[#1F2937] dark:hover:text-white transition-colors">返回</button>
@@ -532,7 +532,7 @@ function PracticeContent() {
             </div>
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-full mt-2">
               <span className="text-sm">🎁</span>
-              <span className="text-xs md:text-sm text-green-700 dark:text-green-400">每人1次免费体验机会，紧张测试和阿搭聊天完全免费</span>
+              <span className="text-xs md:text-sm text-green-700 dark:text-green-400">前2次免费体验，紧张测试和阿搭聊天完全免费</span>
             </div>
           </div>
           <div className="space-y-4">
