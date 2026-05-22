@@ -33,6 +33,19 @@ export function HeroSection() {
           免费测紧张类型，先诊断再练习
         </p>
 
+        {/* 社交证明 */}
+        <div className="flex items-center justify-center gap-4 mb-6 md:mb-10">
+          <div className="flex items-center gap-1.5">
+            <div className="flex -space-x-2">
+              {['🧑','👩','👨','👧','👦'].map((e, i) => (
+                <div key={i} className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-xs md:text-sm border-2 border-white dark:border-[#1A1A2E]">{e}</div>
+              ))}
+            </div>
+            <span className="text-xs md:text-sm text-[#6B7280] dark:text-gray-400 ml-1">10,000+ 人已测</span>
+          </div>
+          <span className="text-xs md:text-sm text-[#FF6B35] font-medium">⭐ 4.9 好评</span>
+        </div>
+
         {/* 阿搭角色定位 */}
         <div className="grid grid-cols-2 gap-2 mb-6 md:mb-10 md:flex md:flex-wrap md:justify-center md:gap-3">
           {[

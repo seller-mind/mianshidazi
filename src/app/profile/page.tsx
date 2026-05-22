@@ -39,6 +39,7 @@ export default function ProfilePage() {
   const [user, setUser] = useState<{ id: string; phone?: string; nickname?: string; avatar_url?: string; free_interviews_used?: number } | null>(null);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [sessions, setSessions] = useState<{id: string; type: string; title: string; created_at: string; updated_at: string}[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingNickname, setEditingNickname] = useState(false);
   const [newNickname, setNewNickname] = useState('');
@@ -48,6 +49,7 @@ export default function ProfilePage() {
     fetchProfile();
     fetchSubscriptions();
     fetchOrders();
+    fetchSessions();
   }, []);
 
   const fetchProfile = async () => {
@@ -60,10 +62,10 @@ export default function ProfilePage() {
         const data = await res.json();
         setUser(data.user);
       } else {
-        router.push('/login');
+        router.push('/login?return=/profile');
       }
     } catch {
-      router.push('/login');
+      router.push('/login?return=/profile');
     } finally {
       setLoading(false);
     }
@@ -93,6 +95,21 @@ export default function ProfilePage() {
       if (res.ok) {
         const data = await res.json();
         setOrders(data.orders || []);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const fetchSessions = async () => {
+    try {
+      const token = localStorage.getItem('msd_token');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch('/api/chat/sessions', { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setSessions((data.sessions || []).slice(0, 10));
       }
     } catch {
       // ignore
@@ -237,6 +254,38 @@ export default function ProfilePage() {
               </Link>
             </div>
           )}
+        </div>
+
+        {/* 面试历史 */}
+        <div className="bg-white dark:bg-[#252542] rounded-xl p-4 mb-4 shadow-sm">
+          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">面试练习记录</h3>
+          {sessions.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-4">还没有练习记录，开始第一次模拟面试吧</p>
+          ) : (
+            <div className="space-y-3">
+              {sessions.slice(0, 10).map(session => (
+                <div key={session.id} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
+                  <div>
+                    <p className="text-sm text-gray-800 dark:text-gray-200">{session.title || (session.type === 'interview' ? '模拟面试' : '阿搭聊天')}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{formatDate(session.updated_at || session.created_at)}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                      session.type === 'interview' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {session.type === 'interview' ? '面试' : '聊天'}
+                    </span>
+                    <Link href={session.type === 'interview' ? '/practice' : '/companion'} className="text-xs text-[#FF6B35] hover:underline">
+                      继续 →
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <Link href="/practice" className="block mt-3 text-xs text-[#FF6B35] hover:underline text-center">
+            开始新的模拟面试 →
+          </Link>
         </div>
 
         {/* 历史订单 */}

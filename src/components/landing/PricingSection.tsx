@@ -72,7 +72,7 @@ export function PricingSection() {
 
       const meRes = await fetch('/api/auth/me', { headers: { Authorization: headers['Authorization'] || '' } });
       if (!meRes.ok) {
-        window.location.href = '/login';
+        window.location.href = '/login?return=/pricing';
         return;
       }
 
@@ -85,7 +85,7 @@ export function PricingSection() {
 
       if (payData.error) {
         if (payData.error.includes('登录')) {
-          window.location.href = '/login';
+          window.location.href = '/login?return=/pricing';
         } else {
           alert(payData.error);
         }

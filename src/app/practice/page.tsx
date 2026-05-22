@@ -187,13 +187,13 @@ function PracticeContent() {
 
       const meRes = await fetch('/api/auth/me', { redirect: 'follow', credentials: 'include', headers: authHeaders });
       if (meRes.redirected) {
-        router.push('/login');
+        router.push('/login?return=/practice');
         setAuthChecking(false);
         return;
       }
       const meData = await meRes.json();
       if (!meData.user) {
-        router.push('/login');
+        router.push('/login?return=/practice');
         setAuthChecking(false);
         return;
       }
@@ -224,7 +224,7 @@ function PracticeContent() {
 
       setMessages([{ id: generateId(), role: 'assistant', content: intro }]);
     } catch {
-      router.push('/login');
+      router.push('/login?return=/practice');
     } finally {
       setAuthChecking(false);
     }
@@ -506,9 +506,13 @@ function PracticeContent() {
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             返回
           </Link>
-          <div className="text-center mb-8">
+          <div className="text-center mb-6">
             <h1 className="text-3xl font-bold text-[#1F2937] dark:text-white mb-4">选择你的面试官</h1>
-            <p className="text-[#6B7280] dark:text-gray-400">不同风格的面试官，帮你应对不同场景</p>
+            <p className="text-[#6B7280] dark:text-gray-400 mb-3">不同风格的面试官，帮你应对不同场景</p>
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-full">
+              <span className="text-sm">💡</span>
+              <span className="text-xs md:text-sm text-amber-700 dark:text-amber-400">第一次？推荐选「温柔鼓励型」，先找找感觉</span>
+            </div>
           </div>
           <div className="space-y-4">
             {(Object.entries(PERSONA_CONFIGS) as [PersonaType, typeof PERSONA_CONFIGS['A']][]).map(([key, config]) => (
