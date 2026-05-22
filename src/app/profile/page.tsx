@@ -45,6 +45,9 @@ export default function ProfilePage() {
   const [newNickname, setNewNickname] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [referralCode, setReferralCode] = useState('');
+  const [referralCount, setReferralCount] = useState(0);
+  const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -52,6 +55,7 @@ export default function ProfilePage() {
     fetchSubscriptions();
     fetchOrders();
     fetchSessions();
+    fetchReferral();
   }, []);
 
   const fetchProfile = async () => {
@@ -116,6 +120,30 @@ export default function ProfilePage() {
     } catch {
       // ignore
     }
+  };
+
+  const fetchReferral = async () => {
+    try {
+      const token = localStorage.getItem('msd_token');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch('/api/referral/code', { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setReferralCode(data.referralCode);
+        setReferralCount(data.referralCount);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleCopyReferral = () => {
+    const text = `面试紧张？免费测你是哪种紧张类型→面试搭子 https://www.mianshidazi.com?ref=${referralCode}`;
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
 
   const handleSaveNickname = async () => {
@@ -389,6 +417,28 @@ export default function ProfilePage() {
             </div>
           </div>
         )}
+
+        {/* 邀请好友 */}
+        <div className="bg-white dark:bg-[#252542] rounded-xl p-4 mb-4 shadow-sm">
+          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">邀请好友</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">每邀请1位好友注册，双方各得1次免费面试机会</p>
+          {referralCode && (
+            <div className="flex items-center gap-2">
+              <div className="flex-1 px-3 py-2 bg-gray-50 dark:bg-[#1A1A2E] rounded-lg text-sm text-gray-600 dark:text-gray-400 truncate">
+                https://www.mianshidazi.com?ref={referralCode}
+              </div>
+              <button
+                onClick={handleCopyReferral}
+                className="px-4 py-2 bg-[#FF6B35] text-white text-sm rounded-lg hover:bg-[#E55A28] transition-colors whitespace-nowrap"
+              >
+                {copied ? '已复制' : '复制链接'}
+              </button>
+            </div>
+          )}
+          {referralCount > 0 && (
+            <p className="text-xs text-green-600 mt-2">已成功邀请 {referralCount} 位好友</p>
+          )}
+        </div>
 
         {/* 退出登录 */}
         <button

@@ -237,7 +237,7 @@ async function loginUser(phone: string) {
   if (!user) {
     const { data: newUser, error: createErr } = await supabase
       .from('users')
-      .insert({ phone, nickname: generateRandomNickname(), avatar_url: generateDefaultAvatar() })
+      .insert({ phone, nickname: generateRandomNickname(), avatar_url: generateDefaultAvatar(), referred_by: body.ref || null })
       .select()
       .single();
 

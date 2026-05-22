@@ -152,6 +152,53 @@ export default function DiagnosePage() {
             </ul>
           </Card>
 
+          {/* 常见问题 FAQ - SEO */}
+          <Card className="mb-6">
+            <h3 className="font-semibold text-[#1F2937] dark:text-white mb-4">关于面试紧张的常见问题</h3>
+            <div className="space-y-4 text-sm">
+              <div>
+                <p className="font-medium text-[#1F2937] dark:text-white">面试紧张正常吗？</p>
+                <p className="text-[#6B7280] dark:text-gray-400 mt-1">非常正常。面试紧张是人体面对压力时的自然应激反应，适度紧张甚至能提升注意力。关键是要了解自己的紧张类型，找到合适的应对方式。</p>
+              </div>
+              <div>
+                <p className="font-medium text-[#1F2937] dark:text-white">面试紧张和面试焦虑有什么区别？</p>
+                <p className="text-[#6B7280] dark:text-gray-400 mt-1">面试紧张是短期的、情境性的，面试结束后会缓解。面试焦虑是持续的、过度的担忧，可能影响日常生活。如果你的紧张感严重影响正常功能，建议寻求专业帮助。</p>
+              </div>
+              <div>
+                <p className="font-medium text-[#1F2937] dark:text-white">怎么快速缓解面试紧张？</p>
+                <p className="text-[#6B7280] dark:text-gray-400 mt-1">最有效的方法是提前进行模拟面试练习，让自己熟悉面试场景。了解自己的紧张类型也很重要，不同类型需要不同的应对策略。语音模拟面试能帮助你"脱敏"，练多了就不怕了。</p>
+              </div>
+              <div>
+                <p className="font-medium text-[#1F2937] dark:text-white">面试紧张到说不出话怎么办？</p>
+                <p className="text-[#6B7280] dark:text-gray-400 mt-1">这通常是"脑暴型紧张"的表现——脑子里有很多想法但说不出来。可以尝试先说一句过渡话（"这个问题很好，让我想想"），给自己几秒钟组织语言。长期来说，语音模拟面试练习能有效改善。</p>
+              </div>
+              <div>
+                <p className="font-medium text-[#1F2937] dark:text-white">面试前紧张睡不着怎么办？</p>
+                <p className="text-[#6B7280] dark:text-gray-400 mt-1">白天充分练习可以增强信心，减少睡前的焦虑。睡前避免反复回忆面试可能的问题，可以听轻音乐或做放松活动。记住：练得越多，越有底气，也就越容易入睡。</p>
+              </div>
+            </div>
+          </Card>
+
+          {/* 分享按钮 */}
+          <div className="flex gap-3 mb-4">
+            <button
+              onClick={() => {
+                const shareText = `我的面试紧张类型是${typeInfo.emoji} ${typeInfo.name}！紧张指数${result.tensionIndex}，你呢？免费测→面试搭子 mianshidazi.com`;
+                if (navigator.share) {
+                  navigator.share({ title: '面试紧张类型测试结果', text: shareText, url: 'https://www.mianshidazi.com/diagnose' }).catch(() => {});
+                } else {
+                  navigator.clipboard.writeText(shareText).then(() => alert('已复制，粘贴发给朋友吧！'));
+                }
+              }}
+              className="flex-1 flex items-center justify-center gap-2 py-3 bg-orange-50 dark:bg-orange-900/20 text-[#FF6B35] rounded-xl text-sm font-medium hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+              </svg>
+              分享给朋友测一测
+            </button>
+          </div>
+
           {/* CTA按钮 */}
           <div className="flex flex-col gap-4">
             <Button size="lg" className="w-full" onClick={handleGoToPractice}>

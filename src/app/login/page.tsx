@@ -40,13 +40,14 @@ export default function LoginPage() {
       const res = await fetch('/api/auth/sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, action: 'verify', code: smsCode }),
+        body: JSON.stringify({ phone, action: 'verify', code: smsCode, ref: localStorage.getItem('msd_ref') || '' }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || '验证失败'); return; }
       // 存token到localStorage，备用认证方式
       if (data.token) {
         localStorage.setItem('msd_token', data.token);
+        localStorage.removeItem('msd_ref');
       }
       const returnUrl = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('return') : null;
       router.push(returnUrl || '/practice');

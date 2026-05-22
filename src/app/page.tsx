@@ -17,6 +17,14 @@ import { Suspense } from 'react';
 function HomeContent() {
   const searchParams = useSearchParams();
 
+  // Store referral code from URL
+  useEffect(() => {
+    const ref = searchParams.get('ref');
+    if (ref) {
+      localStorage.setItem('msd_ref', ref);
+    }
+  }, [searchParams]);
+
   useEffect(() => {
     if (searchParams.get('pricing') === 'true') {
       setTimeout(() => {

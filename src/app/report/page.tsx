@@ -233,6 +233,24 @@ function ReportContent() {
           </Card>
         )}
 
+        {/* 分享报告 */}
+        <button
+          onClick={() => {
+            const shareText = `我刚完成了一次AI模拟面试！表现分${report.actualScore || '?'}分，面试搭子真的有用 mianshidazi.com`;
+            if (navigator.share) {
+              navigator.share({ title: '我的AI面试报告', text: shareText, url: 'https://www.mianshidazi.com' }).catch(() => {});
+            } else {
+              navigator.clipboard.writeText(shareText).then(() => alert('已复制，发给朋友看看吧！'));
+            }
+          }}
+          className="w-full flex items-center justify-center gap-2 py-3 bg-orange-50 dark:bg-orange-900/20 text-[#FF6B35] rounded-xl text-sm font-medium hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors mb-4"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+          </svg>
+          分享我的面试报告
+        </button>
+
         <div className="flex flex-col gap-4">
           <Link href="/practice">
             <Button size="lg" className="w-full">再来一次练习 →</Button>
