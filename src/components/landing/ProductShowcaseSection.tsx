@@ -37,7 +37,7 @@ export function ProductShowcaseSection() {
 
   return (
     <section className="py-10 md:py-20 px-4 md:px-6 bg-gradient-to-b from-white to-gray-50 dark:from-[#1A1A2E] dark:to-[#252542]">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         {/* 标题 */}
         <div className="text-center mb-8 md:mb-16">
           <h2 className="text-2xl md:text-4xl font-bold text-[#1F2937] dark:text-white mb-3 md:mb-4">
@@ -53,7 +53,7 @@ export function ProductShowcaseSection() {
           {features.map((feature, index) => (
             <div
               key={index}
-              className={`bg-gradient-to-br ${feature.color} rounded-xl p-3 md:p-5 border border-gray-100 dark:border-gray-800 hover:shadow-lg transition-shadow relative`}
+              className={`bg-gradient-to-br ${feature.color} rounded-2xl p-5 md:p-7 border border-gray-100 dark:border-gray-800 hover:shadow-lg transition-shadow relative`}
             >
               {/* 标签 */}
               <div className="absolute top-3 right-3 md:top-4 md:right-4">
@@ -62,11 +62,11 @@ export function ProductShowcaseSection() {
                 </span>
               </div>
 
-              <span className="text-xl md:text-2xl mb-1.5 md:mb-3 block">{feature.emoji}</span>
-              <h3 className="text-sm md:text-base font-semibold text-[#1F2937] dark:text-white mb-1 md:mb-1.5">
+              <span className="text-3xl md:text-4xl mb-2 md:mb-4 block">{feature.emoji}</span>
+              <h3 className="text-base md:text-lg font-semibold text-[#1F2937] dark:text-white mb-2">
                 {feature.title}
               </h3>
-              <p className="text-[10px] md:text-xs text-[#6B7280] dark:text-gray-400 leading-relaxed">
+              <p className="text-xs md:text-sm text-[#6B7280] dark:text-gray-400 leading-relaxed">
                 {feature.description}
               </p>
             </div>
