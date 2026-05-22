@@ -184,7 +184,7 @@ export function PricingSection() {
 
         <div className="mt-8 md:mt-12 text-center">
           <p className="text-xs md:text-sm text-[#6B7280] dark:text-gray-400">
-            紧张测试和阿搭聊天<span className="text-[#FF6B35] font-medium">永久免费</span>，只有模拟面试收费
+            紧张测试和阿搭聊天<span className="text-[#FF6B35] font-medium">免费</span>，只有模拟面试收费
           </p>
           <p className="text-[10px] md:text-xs text-[#9CA3AF] dark:text-gray-500 mt-1">
             <Link href="/diagnose" className="hover:text-[#FF6B35] transition-colors">
