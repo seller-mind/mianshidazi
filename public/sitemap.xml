@@ -23,6 +23,31 @@
   <url>
     <loc>https://www.mianshidazi.com/blog</loc>
     <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.mianshidazi.com/blog/mianshi-jinzhang-zhende-bushi-ni-buhui</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.mianshidazi.com/blog/mianshi-zhuizhen-bushi-shenpan</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.mianshidazi.com/blog/mianshi-jinzhang-leixing</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.mianshidazi.com/blog/shekong-mianshi</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.mianshidazi.com/blog/mianshi-qian-yi-wan-shuibuzhao</loc>
+    <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
 </urlset>
