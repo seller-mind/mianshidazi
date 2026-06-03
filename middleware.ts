@@ -1,7 +1,18 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
+// Geo-block: China mainland (compliance with AI regulations)
+const BLOCKED_COUNTRIES = ['CN'];
+
 export async function middleware(request: NextRequest) {
-  // 只做基本处理，认证逻辑由客户端和API层负责
+  // Block China mainland access
+  const country = request.geo?.country || request.headers.get('x-vercel-ip-country') || '';
+  if (BLOCKED_COUNTRIES.includes(country)) {
+    return new NextResponse('This service is not available in your region.', {
+      status: 451,
+      headers: { 'Content-Type': 'text/plain' },
+    });
+  }
+
   return NextResponse.next();
 }
 
