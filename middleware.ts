@@ -1,12 +1,11 @@
-import { type NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
 // Geo-block: China mainland (compliance with AI regulations)
-const BLOCKED_COUNTRIES = ['CN'];
-
-export async function middleware(request: NextRequest) {
-  // Block China mainland access
-  const country = request.geo?.country || request.headers.get('x-vercel-ip-country') || '';
-  if (BLOCKED_COUNTRIES.includes(country)) {
+export function middleware(request: NextRequest) {
+  // Vercel provides x-vercel-ip-country header
+  const country = request.headers.get('x-vercel-ip-country') || '';
+  if (country === 'CN') {
     return new NextResponse('This service is not available in your region.', {
       status: 451,
       headers: { 'Content-Type': 'text/plain' },
