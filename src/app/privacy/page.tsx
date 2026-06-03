@@ -69,6 +69,27 @@ export default function PrivacyPage() {
         <li><strong>法律要求</strong>：根据法律法规、政府要求或司法程序必须提供时</li>
       </ul>
 
+
+      <h2>2.5 AI数据处理与跨境传输</h2>
+      <p className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg border border-orange-200 dark:border-orange-800">
+        <strong>⚠️ EU/EEA用户重要提示：</strong>本服务使用的AI服务商位于欧洲经济区之外（包括中国）。使用本服务即表示您知悉并同意您的数据在这些司法管辖区的服务器上传输和处理。
+      </p>
+      <p>我们的AI处理涉及以下国际数据传输：</p>
+      <ul>
+        <li><strong>豆包/Doubao（火山引擎）</strong>：服务器位于中国。对话内容和面试练习数据将传输至豆包服务器进行AI处理。数据处理为实时进行，生成响应后不保留输入。</li>
+        <li><strong>通义千问/DashScope（阿里云百炼）</strong>：服务器位于中国。用于语音识别和报告生成，数据实时处理后不保留。</li>
+        <li><strong>SiliconFlow</strong>：AI语音转文字服务，服务器可能位于中国或海外。</li>
+        <li><strong>Supabase</strong>：数据库位于新加坡。用户数据存储于Supabase服务器。</li>
+        <li><strong>Vercel</strong>：网站托管服务，服务器位于美国及全球。</li>
+      </ul>
+      <h3>GDPR保障措施（第44条及以后）</h3>
+      <ul>
+        <li>所有数据传输使用TLS 1.2+加密</li>
+        <li>AI服务商实时处理数据，生成响应后不保留输入</li>
+        <li>我们最小化发送给AI服务商的数据——仅传输必要内容</li>
+        <li>您可以随时停止使用本服务以撤回同意</li>
+      </ul>
+
       <h2>四、您的权利</h2>
       
       <p>根据《个人信息保护法》，您享有以下权利：</p>
